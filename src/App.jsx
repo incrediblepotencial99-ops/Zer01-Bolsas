@@ -189,6 +189,7 @@ export default function App() {
   const [codigoNovo, setCodigoNovo] = useState("");
   const [feedbackDevolvido, setFeedbackDevolvido] = useState(null);
   const [feedbackNovo, setFeedbackNovo] = useState(null);
+  const [showClientPossessions, setShowClientPossessions] = useState(false);
 
   const [formFuncionario, setFormFuncionario] = useState({
     email: "", password: "", nome: "", role: "funcionario", telefone: ""
@@ -4672,13 +4673,16 @@ export default function App() {
                           <select 
                             required 
                             value={formTroca.cliente_id} 
-                            onChange={e => setFormTroca({ 
-                              ...formTroca, 
-                              cliente_id: e.target.value,
-                              venda_id: "",
-                              bolsa_devolvida_id: "",
-                              bolsa_nova_id: ""
-                            })}
+                            onChange={e => {
+                              setFormTroca({ 
+                                ...formTroca, 
+                                cliente_id: e.target.value,
+                                venda_id: "",
+                                bolsa_devolvida_id: "",
+                                bolsa_nova_id: ""
+                              });
+                              setShowClientPossessions(false);
+                            }}
                             className="h-11 w-full rounded-xl border border-[#EACAD6] bg-white px-3 text-[#29141B] placeholder-[#29141B]/55 focus:border-[#D12D6C] focus:ring-1 focus:ring-[#D12D6C] focus:outline-none transition-all shadow-sm text-sm cursor-pointer"
                           >
                             <option value="" disabled hidden>Selecione o cliente...</option>
@@ -4688,48 +4692,76 @@ export default function App() {
                           </select>
                         </div>
 
-                        {/* Itens em posse do cliente selecionado */}
+                        {/* Itens em posse do cliente selecionado (Gaveta colapsável) */}
                         {formTroca.cliente_id && (() => {
                           const clientActiveSales = vendas.filter(v => v.cliente_id === formTroca.cliente_id && !v.devolvida);
                           if (clientActiveSales.length === 0) return null;
                           return (
-                            <div className="flex flex-col gap-1.5 mt-1 bg-[#FCFAF9] border border-[#FCEEF3] rounded-2xl p-3 shadow-xs">
-                              <span className="text-[9px] font-extrabold uppercase text-[#29141B]/60 tracking-wider flex items-center gap-1.5 select-none">
-                                <span className="material-symbols-outlined text-xs text-[#D12D6C]">inventory_2</span>
-                                Itens comprados (Em Posse) ({clientActiveSales.length})
-                              </span>
-                              <p className="text-[9px] text-[#29141B]/55 select-none -mt-1 mb-0.5">Clique em um item para selecioná-lo para a troca:</p>
-                              <div className="flex flex-col gap-1.5 max-h-[140px] overflow-y-auto pr-1">
-                                {clientActiveSales.map(v => (
-                                  <div 
-                                    key={v.id} 
-                                    onClick={() => {
-                                      if (v.bolsas?.codigo) {
-                                        setCodigoDevolvido(v.bolsas.codigo);
-                                        setFormTroca(prev => ({
-                                          ...prev,
-                                          venda_id: v.id,
-                                          bolsa_devolvida_id: v.bolsa_id
-                                        }));
-                                        setFeedbackDevolvido({
-                                          success: true,
-                                          message: `Selecionado: "${v.bolsas?.nome}" • Código: ${v.bolsas?.codigo} • Pago original: R$ ${Number(v.preco_vendido).toFixed(2)}`
-                                        });
-                                      }
-                                    }}
-                                    className="bg-white border border-[#EACAD6]/40 hover:border-[#D12D6C]/50 hover:bg-[#FFEBF2]/20 rounded-xl p-2.5 flex items-center justify-between cursor-pointer transition-all duration-200 active:scale-98 group shadow-xs"
-                                    title="Clique para selecionar este produto para devolução"
+                            <div className="flex flex-col mt-1 bg-white border border-[#EACAD6]/60 rounded-xl overflow-hidden shadow-xs transition-all duration-350">
+                              {/* Cabeçalho / Gatilho da Gaveta */}
+                              <button
+                                type="button"
+                                onClick={() => setShowClientPossessions(!showClientPossessions)}
+                                className="w-full flex items-center justify-between py-2.5 px-3 bg-[#FCFAF9] hover:bg-[#FFEBF2]/40 text-xs text-[#29141B] font-bold transition-all duration-200 cursor-pointer border-b border-[#EACAD6]/20 select-none outline-none"
+                              >
+                                <span className="flex items-center gap-1.5">
+                                  <span className="material-symbols-outlined text-[16px] text-[#D12D6C]">shopping_bag</span>
+                                  Sacola do Cliente ({clientActiveSales.length})
+                                </span>
+                                <span 
+                                  className="material-symbols-outlined text-[16px] text-[#29141B]/60 transition-transform duration-300"
+                                  style={{ transform: showClientPossessions ? "rotate(180deg)" : "rotate(0deg)" }}
+                                >
+                                  keyboard_arrow_down
+                                </span>
+                              </button>
+
+                              {/* Conteúdo Expansível com Animação */}
+                              <AnimatePresence>
+                                {showClientPossessions && (
+                                  <motion.div
+                                    initial={{ height: 0, opacity: 0 }}
+                                    animate={{ height: "auto", opacity: 1 }}
+                                    exit={{ height: 0, opacity: 0 }}
+                                    transition={{ duration: 0.25, ease: "easeInOut" }}
+                                    className="overflow-hidden bg-[#FCFAF9] p-3 flex flex-col gap-2"
                                   >
-                                    <div className="flex flex-col min-w-0 flex-1">
-                                      <span className="text-xs font-bold text-[#29141B] truncate group-hover:text-[#D12D6C] transition-colors">{v.bolsas?.nome}</span>
-                                      <span className="text-[9px] text-[#29141B]/60 font-mono mt-0.5">Cód: {v.bolsas?.codigo || "-"}</span>
+                                    <p className="text-[9px] text-[#29141B]/55 select-none">Clique no item para selecioná-lo para devolução:</p>
+                                    <div className="flex flex-col gap-1.5 max-h-[140px] overflow-y-auto pr-1">
+                                      {clientActiveSales.map(v => (
+                                        <div 
+                                          key={v.id} 
+                                          onClick={() => {
+                                            if (v.bolsas?.codigo) {
+                                              setCodigoDevolvido(v.bolsas.codigo);
+                                              setFormTroca(prev => ({
+                                                ...prev,
+                                                venda_id: v.id,
+                                                bolsa_devolvida_id: v.bolsa_id
+                                              }));
+                                              setFeedbackDevolvido({
+                                                success: true,
+                                                message: `Selecionado: "${v.bolsas?.nome}" • Código: ${v.bolsas?.codigo} • Pago original: R$ ${Number(v.preco_vendido).toFixed(2)}`
+                                              });
+                                              setShowClientPossessions(false); // Recolhe a gaveta após a seleção
+                                            }
+                                          }}
+                                          className="bg-white border border-[#EACAD6]/40 hover:border-[#D12D6C]/50 hover:bg-[#FFEBF2]/20 rounded-xl p-2.5 flex items-center justify-between cursor-pointer transition-all duration-200 active:scale-98 group shadow-xs"
+                                          title="Clique para selecionar este produto para devolução"
+                                        >
+                                          <div className="flex flex-col min-w-0 flex-1">
+                                            <span className="text-xs font-bold text-[#29141B] truncate group-hover:text-[#D12D6C] transition-colors">{v.bolsas?.nome}</span>
+                                            <span className="text-[9px] text-[#29141B]/60 font-mono mt-0.5">Cód: {v.bolsas?.codigo || "-"}</span>
+                                          </div>
+                                          <span className="text-xs font-extrabold text-emerald-600 bg-emerald-50 border border-emerald-100/50 px-2 py-0.5 rounded shrink-0">
+                                            R$ {Number(v.preco_vendido).toFixed(2)}
+                                          </span>
+                                        </div>
+                                      ))}
                                     </div>
-                                    <span className="text-xs font-extrabold text-emerald-600 bg-emerald-50 border border-emerald-100/50 px-2 py-0.5 rounded shrink-0">
-                                      R$ {Number(v.preco_vendido).toFixed(2)}
-                                    </span>
-                                  </div>
-                                ))}
-                              </div>
+                                  </motion.div>
+                                )}
+                              </AnimatePresence>
                             </div>
                           );
                         })()}
