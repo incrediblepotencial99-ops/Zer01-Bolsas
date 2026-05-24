@@ -398,7 +398,8 @@ export default function App() {
         options: {
           data: {
             nome: nome,
-            telefone: telefone
+            telefone: telefone,
+            role: hasNoUsers ? "admin" : "funcionario"
           }
         }
       });
