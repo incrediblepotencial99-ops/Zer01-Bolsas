@@ -182,7 +182,7 @@ export default function App() {
   };
 
   const [formTroca, setFormTroca] = useState({
-    cliente_id: "", venda_id: "", bolsa_devolvida_id: "", bolsa_nova_id: "", motivo: "", forma_pagamento: "pix"
+    cliente_id: "", venda_id: "", bolsa_devolvida_id: "", bolsa_nova_id: "", motivo: "", forma_pagamento: "pix", desconto_novo: 0
   });
   const [codigoDevolvido, setCodigoDevolvido] = useState("");
   const [codigoNovo, setCodigoNovo] = useState("");
@@ -1163,8 +1163,10 @@ export default function App() {
       // Calculate difference in value using the original price paid
       const vendaOrig = vendas.find(v => v.id === formTroca.venda_id);
       const precoPagoOriginal = vendaOrig ? Number(vendaOrig.preco_vendido) : 0;
-      const precoNova = nova.desconto_ativo && nova.preco_desconto ? Number(nova.preco_desconto) : Number(nova.preco_venda);
-      const diferenca = precoNova - precoPagoOriginal;
+      const precoBaseNova = Number(nova.preco_venda);
+      const descontoNova = Number(formTroca.desconto_novo) || 0;
+      const precoNovaCobrado = precoBaseNova - descontoNova;
+      const diferenca = precoNovaCobrado - precoPagoOriginal;
 
       // 1. Perform atomic exchange transaction via RPC in Supabase
       const { error: exchangeErr } = await supabase
@@ -1178,7 +1180,10 @@ export default function App() {
             : formTroca.motivo,
           p_diferenca_valor: diferenca,
           p_forma_pagamento: formTroca.forma_pagamento || "pix",
-          p_venda_orig_id: formTroca.venda_id || null
+          p_venda_orig_id: formTroca.venda_id || null,
+          p_preco_venda_novo: precoNovaCobrado,
+          p_desconto_novo: descontoNova,
+          p_tinha_desconto_novo: descontoNova > 0
         });
 
       if (exchangeErr) throw exchangeErr;
@@ -1191,7 +1196,7 @@ export default function App() {
         alert(`Troca concluída! Sem diferença de valor.`);
       }
 
-      setFormTroca({ cliente_id: "", venda_id: "", bolsa_devolvida_id: "", bolsa_nova_id: "", motivo: "", forma_pagamento: "pix" });
+      setFormTroca({ cliente_id: "", venda_id: "", bolsa_devolvida_id: "", bolsa_nova_id: "", motivo: "", forma_pagamento: "pix", desconto_novo: 0 });
       setCodigoDevolvido("");
       setCodigoNovo("");
       setFeedbackDevolvido(null);
@@ -1305,7 +1310,7 @@ export default function App() {
       trocasFiltro = trocasFiltro.filter(t => t.funcionario_id === dashboardVendedorFilter);
     }
 
-    const faturamentoVendasMes = vendasFiltro.reduce((acc, v) => acc + Number(v.preco_vendido), 0);
+    const faturamentoVendasMes = vendasFiltro.filter(v => v.forma_pagamento !== 'troca').reduce((acc, v) => acc + Number(v.preco_vendido), 0);
     const faturamentoTrocasMes = trocasFiltro.reduce((acc, t) => acc + Number(t.diferenca_valor || 0), 0);
     const totalFaturadoMes = faturamentoVendasMes + faturamentoTrocasMes;
     const qtdVendasMes = vendasFiltro.length;
@@ -1328,7 +1333,7 @@ export default function App() {
       trocasHoje = trocasHoje.filter(t => t.funcionario_id === dashboardVendedorFilter);
     }
 
-    const faturamentoVendasHoje = vendasHoje.reduce((acc, v) => acc + Number(v.preco_vendido), 0);
+    const faturamentoVendasHoje = vendasHoje.filter(v => v.forma_pagamento !== 'troca').reduce((acc, v) => acc + Number(v.preco_vendido), 0);
     const faturamentoTrocasHoje = trocasHoje.reduce((acc, t) => acc + Number(t.diferenca_valor || 0), 0);
     const faturamentoHoje = faturamentoVendasHoje + faturamentoTrocasHoje;
     const qtdVendasHoje = vendasHoje.length;
@@ -1461,16 +1466,7 @@ export default function App() {
       }
     });
 
-    dashboardTrocasFiltradas.forEach(t => {
-      const fid = t.funcionario_id;
-      if (fid) {
-        if (!mapa[fid]) {
-          mapa[fid] = { id: fid, nome: t.profiles?.nome || "Ex-colaborador", role: "funcionario", total: 0, quantidade: 0 };
-        }
-        mapa[fid].total += Number(t.diferenca_valor || 0);
-      }
-    });
-
+    // Trocas não entram no faturamento do vendedor para evitar dupla dedução/ajustes negativos de caixa
     return Object.values(mapa).sort((a, b) => b.total - a.total);
   }, [dashboardVendasFiltradas, dashboardTrocasFiltradas, funcionarios]);
 
@@ -1506,6 +1502,8 @@ export default function App() {
     let totalFaturado = 0;
     
     relatorioVendas.forEach(v => {
+      if (v.forma_pagamento === "troca") return; // Ignorar vendas de troca no faturamento de caixa
+      
       const valor = Number(v.preco_vendido) || 0;
       totalFaturado += valor;
       
@@ -1581,16 +1579,7 @@ export default function App() {
       }
     });
 
-    relatorioTrocas.forEach(t => {
-      const fid = t.funcionario_id;
-      if (fid) {
-        if (!mapa[fid]) {
-          mapa[fid] = { id: fid, nome: t.profiles?.nome || "Ex-colaborador", role: "funcionario", total: 0, quantidade: 0 };
-        }
-        mapa[fid].total += Number(t.diferenca_valor) || 0;
-      }
-    });
-
+    // Trocas não entram no faturamento do vendedor para evitar dupla dedução/ajustes negativos de caixa
     return Object.values(mapa).sort((a, b) => b.total - a.total);
   }, [relatorioVendas, relatorioTrocas, funcionarios]);
 
@@ -4275,8 +4264,22 @@ export default function App() {
                             {vendas.map(v => (
                               <tr key={v.id} className="border-b border-[#FCEEF3] hover:bg-[#FFEBF2]/40 transition-colors">
                                 <td className="p-3">
-                                  <span className="block font-bold text-[#29141B]">{v.bolsas?.nome}</span>
-                                  <span className="block text-[10px] text-[#29141B]/60">Cód: {v.bolsas?.codigo || "N/A"}</span>
+                                  <div className="flex items-center gap-2">
+                                    <div>
+                                      <span className="block font-bold text-[#29141B]">{v.bolsas?.nome}</span>
+                                      <span className="block text-[10px] text-[#29141B]/60">Cód: {v.bolsas?.codigo || "N/A"}</span>
+                                    </div>
+                                    {v.observacao && v.observacao.includes("[Trocada/Devolvida") && (
+                                      <span className="text-[8px] bg-rose-50 border border-rose-200 text-rose-600 font-extrabold uppercase px-1.5 py-0.5 rounded shrink-0" title="Este produto foi devolvido ou trocado">
+                                        Devolvida
+                                      </span>
+                                    )}
+                                    {v.forma_pagamento === "troca" && (
+                                      <span className="text-[8px] bg-sky-50 border border-sky-200 text-sky-600 font-extrabold uppercase px-1.5 py-0.5 rounded shrink-0" title="Este produto saiu como parte de uma troca">
+                                        Troca
+                                      </span>
+                                    )}
+                                  </div>
                                 </td>
                                 <td className="p-3">
                                   <span className="text-[#29141B] font-medium">{v.clientes?.nome || "Consumidor Geral"}</span>
@@ -4351,9 +4354,21 @@ export default function App() {
                         {vendas.map(v => (
                           <div key={v.id} className="bg-white border border-[#EACAD6]/40 rounded-2xl p-4 flex flex-col gap-3 shadow-sm hover:bg-[#FCFAF9]/50 transition-colors">
                             <div className="flex items-start justify-between gap-2">
-                              <div>
-                                <span className="block font-bold text-[#29141B] text-sm">{v.bolsas?.nome}</span>
-                                <span className="block text-[10px] text-[#29141B]/60">Cód: {v.bolsas?.codigo || "N/A"}</span>
+                              <div className="flex items-center gap-2">
+                                <div>
+                                  <span className="block font-bold text-[#29141B] text-sm">{v.bolsas?.nome}</span>
+                                  <span className="block text-[10px] text-[#29141B]/60">Cód: {v.bolsas?.codigo || "N/A"}</span>
+                                </div>
+                                {v.observacao && v.observacao.includes("[Trocada/Devolvida") && (
+                                  <span className="text-[8px] bg-rose-50 border border-rose-200 text-rose-600 font-extrabold uppercase px-1.5 py-0.5 rounded shrink-0">
+                                    Devolvida
+                                  </span>
+                                )}
+                                {v.forma_pagamento === "troca" && (
+                                  <span className="text-[8px] bg-sky-50 border border-sky-200 text-sky-600 font-extrabold uppercase px-1.5 py-0.5 rounded shrink-0">
+                                    Troca
+                                  </span>
+                                )}
                               </div>
                               <div className="flex flex-col items-end gap-1">
                                 <span className="font-bold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-100 text-xs shrink-0">
@@ -4823,6 +4838,28 @@ export default function App() {
                           })()}
                         </div>
 
+                        {/* Campo de Desconto da Bolsa Nova */}
+                        {formTroca.bolsa_nova_id && (
+                          <div className="mt-2 flex flex-col gap-1">
+                            <label className="text-[10px] font-bold text-[#29141B]/85 uppercase tracking-wider" htmlFor="exchange-discount">
+                              Desconto Opcional para o Novo Item (R$)
+                            </label>
+                            <input 
+                              id="exchange-discount"
+                              type="number" 
+                              min="0"
+                              step="0.01"
+                              value={formTroca.desconto_novo} 
+                              onChange={e => {
+                                const val = e.target.value === "" ? "" : Number(e.target.value);
+                                setFormTroca({ ...formTroca, desconto_novo: val });
+                              }} 
+                              placeholder="0.00" 
+                              className="h-11 w-full rounded-xl border border-[#EACAD6] bg-white px-3 text-[#29141B] placeholder-[#29141B]/55 focus:border-[#D12D6C] focus:ring-1 focus:ring-[#D12D6C] focus:outline-none transition-all shadow-sm text-sm"
+                            />
+                          </div>
+                        )}
+
                         <div className="flex flex-col gap-1">
                           <label className="text-[10px] font-bold text-[#29141B]/85 uppercase tracking-wider" htmlFor="exchange-reason">Motivo da Troca</label>
                           <input 
@@ -4841,7 +4878,9 @@ export default function App() {
                           const precoPagoOriginal = vendaOrig ? Number(vendaOrig.preco_vendido) : 0;
                           
                           const nova = bolsas.find(b => b.id === formTroca.bolsa_nova_id);
-                          const precoNova = nova ? (nova.desconto_ativo && nova.preco_desconto ? Number(nova.preco_desconto) : Number(nova.preco_venda)) : 0;
+                          const precoBaseNova = nova ? Number(nova.preco_venda) : 0;
+                          const descontoNova = Number(formTroca.desconto_novo) || 0;
+                          const precoNova = precoBaseNova - descontoNova;
                           
                           const diferenca = precoNova - precoPagoOriginal;
                           
@@ -4858,8 +4897,8 @@ export default function App() {
                                 <span className="text-[#29141B]/60 font-medium">Valor do Novo Produto:</span>
                                 <span className="font-bold text-[#29141B]">
                                   R$ {precoNova.toFixed(2)}
-                                  {nova?.desconto_ativo && (
-                                    <span className="ml-1 text-[10px] text-[#D12D6C] font-bold">(Promocional)</span>
+                                  {descontoNova > 0 && (
+                                    <span className="ml-1 text-[10px] text-emerald-600 font-bold">(Desconto de R$ {descontoNova.toFixed(2)} aplicado)</span>
                                   )}
                                 </span>
                               </div>
