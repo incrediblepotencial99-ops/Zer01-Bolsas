@@ -42,6 +42,7 @@ export default function App() {
   // Navigation
   const [activeTab, setActiveTab] = useState("dashboard");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [highlightedExchangeId, setHighlightedExchangeId] = useState(null);
 
   // Calendário Faturamento
   const [dataSelecionada, setDataSelecionada] = useState(() => new Date());
@@ -1207,6 +1208,34 @@ export default function App() {
       setActiveTab("troca");
     } catch (err) {
       alert("Erro ao registrar troca: " + err.message);
+    }
+  };
+
+  // Rastrear troca de produto devolvido
+  const handleRastrearTroca = (bolsaId, clienteId) => {
+    const trocaCorrespondente = trocas.find(
+      t => t.bolsa_devolvida_id === bolsaId && t.cliente_id === clienteId
+    );
+
+    if (trocaCorrespondente) {
+      setActiveTab("troca");
+      setHighlightedExchangeId(trocaCorrespondente.id);
+
+      // Aguarda renderização da aba e realiza o scroll suave
+      setTimeout(() => {
+        const element = document.getElementById(`troca-row-${trocaCorrespondente.id}`) ||
+                        document.getElementById(`troca-card-${trocaCorrespondente.id}`);
+        if (element) {
+          element.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      }, 200);
+
+      // Limpa o destaque após 3 segundos
+      setTimeout(() => {
+        setHighlightedExchangeId(null);
+      }, 3000);
+    } else {
+      alert("Aviso: Registro detalhado desta troca não foi localizado no histórico.");
     }
   };
 
@@ -4237,7 +4266,12 @@ export default function App() {
                                       <span className="block text-[10px] text-[#29141B]/60">Cód: {v.bolsas?.codigo || "N/A"}</span>
                                     </div>
                                     {v.observacao && v.observacao.includes("[Trocada/Devolvida") && (
-                                      <span className="text-[8px] bg-rose-50 border border-rose-200 text-rose-600 font-extrabold uppercase px-1.5 py-0.5 rounded shrink-0" title="Este produto foi devolvido ou trocado">
+                                      <span 
+                                        className="text-[8px] bg-rose-50 border border-rose-200 text-rose-600 font-extrabold uppercase px-1.5 py-0.5 rounded shrink-0 cursor-pointer hover:bg-rose-100 hover:border-rose-300 transition-all shadow-sm active:scale-95 flex items-center gap-0.5" 
+                                        title="Clique para rastrear esta troca no histórico"
+                                        onClick={() => handleRastrearTroca(v.bolsa_id, v.cliente_id)}
+                                      >
+                                        <span className="material-symbols-outlined text-[10px]">sync_alt</span>
                                         Devolvida
                                       </span>
                                     )}
@@ -4327,7 +4361,12 @@ export default function App() {
                                   <span className="block text-[10px] text-[#29141B]/60">Cód: {v.bolsas?.codigo || "N/A"}</span>
                                 </div>
                                 {v.observacao && v.observacao.includes("[Trocada/Devolvida") && (
-                                  <span className="text-[8px] bg-rose-50 border border-rose-200 text-rose-600 font-extrabold uppercase px-1.5 py-0.5 rounded shrink-0">
+                                  <span 
+                                    className="text-[8px] bg-rose-50 border border-rose-200 text-rose-600 font-extrabold uppercase px-1.5 py-0.5 rounded shrink-0 cursor-pointer hover:bg-rose-100 hover:border-rose-300 transition-all shadow-sm active:scale-95 flex items-center gap-0.5" 
+                                    title="Clique para rastrear esta troca no histórico"
+                                    onClick={() => handleRastrearTroca(v.bolsa_id, v.cliente_id)}
+                                  >
+                                    <span className="material-symbols-outlined text-[10px]">sync_alt</span>
                                     Devolvida
                                   </span>
                                 )}
@@ -4945,7 +4984,15 @@ export default function App() {
                           </thead>
                           <tbody>
                             {trocas.map(t => (
-                              <tr key={t.id} className="border-b border-[#FCEEF3] hover:bg-[#FFEBF2]/10 transition-colors">
+                              <tr 
+                                key={t.id} 
+                                id={`troca-row-${t.id}`}
+                                className={`border-b border-[#FCEEF3] transition-all duration-500 ${
+                                  highlightedExchangeId === t.id 
+                                    ? "bg-[#C9A84C]/15 border-l-4 border-l-[#C9A84C] font-semibold scale-[1.01] shadow-[0_2px_8px_rgba(201,168,76,0.15)] animate-pulse" 
+                                    : "hover:bg-[#FFEBF2]/10"
+                                }`}
+                              >
                                 <td className="p-3 font-bold text-[#29141B]">
                                   {t.clientes?.nome}
                                 </td>
@@ -4990,7 +5037,15 @@ export default function App() {
                       {/* Visualização em Cards (Mobile) */}
                       <div className="block md:hidden flex flex-col gap-3">
                         {trocas.map(t => (
-                          <div key={t.id} className="bg-white border border-[#FCEEF3] rounded-2xl p-4 flex flex-col gap-3 shadow-sm hover:bg-[#FFEBF2]/10 transition-colors">
+                          <div 
+                            key={t.id} 
+                            id={`troca-card-${t.id}`}
+                            className={`border transition-all duration-500 rounded-2xl p-4 flex flex-col gap-3 shadow-sm ${
+                              highlightedExchangeId === t.id 
+                                ? "bg-[#C9A84C]/15 border-[#C9A84C] border-2 ring-2 ring-[#C9A84C]/30 scale-[1.02] animate-pulse" 
+                                : "bg-white border-[#FCEEF3] hover:bg-[#FFEBF2]/10"
+                            }`}
+                          >
                             <div className="flex items-start justify-between gap-2">
                               <div>
                                 <span className="block text-[9px] uppercase tracking-wider font-bold text-[#29141B]/50">Cliente</span>
