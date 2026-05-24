@@ -6455,18 +6455,30 @@ export default function App() {
                 </button>
 
                 {/* Header Section */}
-                <div className="p-6 border-b border-[#EACAD6] flex flex-col gap-1 pr-12 bg-[#FCFAF9]">
-                  <div className="flex items-center gap-2">
-                    <span className="material-symbols-outlined text-[#29141B] text-2xl font-bold">receipt_long</span>
-                    <span className="text-[11px] uppercase font-extrabold text-[#29141B]/80 tracking-widest">Dossiê do Cliente</span>
+                <div className="p-4 md:py-3.5 md:px-6 border-b border-[#EACAD6] flex flex-col md:flex-row md:items-center md:justify-between gap-2 md:gap-4 pr-12 md:pr-16 bg-[#FCFAF9]">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-[#29141B]/5 flex items-center justify-center text-[#29141B] shrink-0">
+                      <span className="material-symbols-outlined text-lg font-bold">receipt_long</span>
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-[9px] uppercase font-extrabold text-[#29141B]/60 tracking-widest leading-none">Dossiê do Cliente</span>
+                      <h2 className="text-base md:text-lg font-black text-[#29141B] mt-0.5 leading-tight">
+                        {selectedClienteForHistory.nome}
+                      </h2>
+                    </div>
                   </div>
-                  <h2 className="text-xl font-extrabold text-[#29141B] leading-tight mt-1">
-                    {selectedClienteForHistory.nome}
-                  </h2>
-                  <p className="text-xs text-[#29141B]/70 font-mono mt-0.5">
-                    {selectedClienteForHistory.cpf ? `CPF: ${selectedClienteForHistory.cpf}` : "Sem CPF cadastrado"} 
-                    {selectedClienteForHistory.telefone ? ` • Tel: ${selectedClienteForHistory.telefone}` : ""}
-                  </p>
+                  
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-[#29141B]/70 font-mono md:text-right md:flex-col md:items-end md:gap-0">
+                    <span>
+                      {selectedClienteForHistory.cpf ? `CPF: ${selectedClienteForHistory.cpf}` : "Sem CPF"}
+                    </span>
+                    {selectedClienteForHistory.telefone && (
+                      <>
+                        <span className="text-[#29141B]/30 md:hidden">•</span>
+                        <span>Tel: {selectedClienteForHistory.telefone}</span>
+                      </>
+                    )}
+                  </div>
                 </div>
 
                 {/* Content Container (Scrollable) */}
