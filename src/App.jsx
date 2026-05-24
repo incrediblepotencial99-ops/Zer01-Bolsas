@@ -1072,17 +1072,32 @@ export default function App() {
 
     let vendaCorrespondente = null;
     if (formTroca.cliente_id) {
-      vendaCorrespondente = vendas.find(v => v.bolsa_id === bolsaDev.id && v.cliente_id === formTroca.cliente_id);
+      vendaCorrespondente = vendas.find(v => v.bolsa_id === bolsaDev.id && v.cliente_id === formTroca.cliente_id && !v.devolvida);
+      if (!vendaCorrespondente) {
+        vendaCorrespondente = vendas.find(v => v.bolsa_id === bolsaDev.id && v.cliente_id === formTroca.cliente_id);
+      }
     }
     
     if (!vendaCorrespondente) {
-      vendaCorrespondente = vendas.find(v => v.bolsa_id === bolsaDev.id);
+      vendaCorrespondente = vendas.find(v => v.bolsa_id === bolsaDev.id && !v.devolvida);
+      if (!vendaCorrespondente) {
+        vendaCorrespondente = vendas.find(v => v.bolsa_id === bolsaDev.id);
+      }
     }
 
     if (!vendaCorrespondente) {
       setFeedbackDevolvido({ 
         success: false, 
         message: `Produto localizado ("${bolsaDev.nome}"), mas não há vendas dele no histórico!` 
+      });
+      setFormTroca(prev => ({ ...prev, venda_id: "", bolsa_devolvida_id: "" }));
+      return;
+    }
+
+    if (vendaCorrespondente.devolvida) {
+      setFeedbackDevolvido({ 
+        success: false, 
+        message: `Atenção: Este produto ("${bolsaDev.nome}") já foi trocado/devolvido anteriormente!` 
       });
       setFormTroca(prev => ({ ...prev, venda_id: "", bolsa_devolvida_id: "" }));
       return;
@@ -6336,7 +6351,7 @@ export default function App() {
       {/* ── CLIENT PURCHASE & EXCHANGE HISTORY MODAL OVERLAY (Premium) ── */}
       <AnimatePresence>
         {selectedClienteForHistory && (() => {
-          const clientSales = vendas.filter(v => v.cliente_id === selectedClienteForHistory.id);
+          const clientSales = vendas.filter(v => v.cliente_id === selectedClienteForHistory.id && !v.devolvida);
           const clientExchanges = trocas.filter(t => t.cliente_id === selectedClienteForHistory.id);
           const totalSpent = clientSales.reduce((acc, v) => acc + Number(v.preco_vendido), 0);
           
@@ -6489,7 +6504,7 @@ export default function App() {
                               {Number(t.diferenca_valor) > 0 ? (
                                 <span>Diferença a Pagar: <span className="text-green-600 font-bold">R$ {Number(t.diferenca_valor).toFixed(2)}</span></span>
                               ) : Number(t.diferenca_valor) < 0 ? (
-                                <span>Crédito Cliente: <span className="text-amber-600 font-bold">R$ {Math.abs(Number(t.diferenca_valor)).toFixed(2)}</span></span>
+                                <span>Reembolso Cliente: <span className="text-amber-600 font-bold">R$ {Math.abs(Number(t.diferenca_valor)).toFixed(2)}</span></span>
                               ) : (
                                 <span>Diferença: <span className="text-[#29141B]/60 font-normal">R$ 0.00</span></span>
                               )}
