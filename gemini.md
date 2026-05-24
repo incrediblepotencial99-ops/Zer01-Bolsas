@@ -17,6 +17,9 @@ Este documento define os invariantes, regras comportamentais e esquemas de dados
    * Tema escuro profundo com base em `#1A1A2E`.
    * Destaques de marca em dourado `#C9A84C`.
    * Layout responsivo (mobile-first), com micro-animações suaves e design premium.
+4. **Preservação de Dados e Segurança (Data Safety Guard):**
+   * Nunca apagar dados de tabelas cadastrais base (como bolsas ou produtos) ou realizar resets totais destrutivos no banco de dados sem a permissão explícita detalhada do usuário listando cada tabela que deve ser limpa.
+   * Em solicitações de reset de contas de usuário ou remoção de login, apagar estritamente os registros relevantes de autenticação (`auth.users`) e perfil correspondente (`profiles`), mantendo os produtos e outros dados de inventário intactos para não prejudicar ou atrapalhar o trabalho do usuário.
 
 ---
 
