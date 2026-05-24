@@ -656,6 +656,8 @@ export default function App() {
     // Produtos mais vendidos do período (Top Sellers)
     const topSellersMap = {};
     relatorioVendas.forEach(v => {
+      if (v.devolvida) return; // Ignorar vendas devolvidas no ranking de mais vendidos
+      
       const bolsaId = v.bolsa_id;
       if (bolsaId) {
         if (!topSellersMap[bolsaId]) {
@@ -723,7 +725,7 @@ export default function App() {
     const totalNovo = trocasDetalhadas.reduce((acc, t) => acc + t.precoNova, 0);
     const saldoTrocasConsolidado = totalNovo - totalDevolvido;
 
-    const totalDescontos = relatorioVendas.reduce((acc, v) => acc + (Number(v.desconto_valor) || 0), 0);
+    const totalDescontos = relatorioVendas.filter(v => !v.devolvida).reduce((acc, v) => acc + (Number(v.desconto_valor) || 0), 0);
     const faturamentoBruto = relatorioStats.totalFaturado + totalDescontos;
 
     const htmlContent = gerarRelatorioHtml({
@@ -1310,10 +1312,9 @@ export default function App() {
       trocasFiltro = trocasFiltro.filter(t => t.funcionario_id === dashboardVendedorFilter);
     }
 
-    const faturamentoVendasMes = vendasFiltro.filter(v => v.forma_pagamento !== 'troca').reduce((acc, v) => acc + Number(v.preco_vendido), 0);
-    const faturamentoTrocasMes = trocasFiltro.reduce((acc, t) => acc + Number(t.diferenca_valor || 0), 0);
-    const totalFaturadoMes = faturamentoVendasMes + faturamentoTrocasMes;
-    const qtdVendasMes = vendasFiltro.length;
+    const faturamentoVendasMes = vendasFiltro.filter(v => !v.devolvida).reduce((acc, v) => acc + Number(v.preco_vendido), 0);
+    const totalFaturadoMes = faturamentoVendasMes;
+    const qtdVendasMes = vendasFiltro.filter(v => !v.devolvida).length;
 
     // Alertas de estoque baixo
     const alertasEstoque = bolsas.filter(b => b.quantidade <= Math.max(Number(b.quantidade_minima || 0), 2));
@@ -1333,10 +1334,9 @@ export default function App() {
       trocasHoje = trocasHoje.filter(t => t.funcionario_id === dashboardVendedorFilter);
     }
 
-    const faturamentoVendasHoje = vendasHoje.filter(v => v.forma_pagamento !== 'troca').reduce((acc, v) => acc + Number(v.preco_vendido), 0);
-    const faturamentoTrocasHoje = trocasHoje.reduce((acc, t) => acc + Number(t.diferenca_valor || 0), 0);
-    const faturamentoHoje = faturamentoVendasHoje + faturamentoTrocasHoje;
-    const qtdVendasHoje = vendasHoje.length;
+    const faturamentoVendasHoje = vendasHoje.filter(v => !v.devolvida).reduce((acc, v) => acc + Number(v.preco_vendido), 0);
+    const faturamentoHoje = faturamentoVendasHoje;
+    const qtdVendasHoje = vendasHoje.filter(v => !v.devolvida).length;
 
     return {
       totalDisponiveis,
@@ -1456,6 +1456,8 @@ export default function App() {
     });
 
     dashboardVendasFiltradas.forEach(v => {
+      if (v.devolvida) return; // Ignorar vendas devolvidas no faturamento do vendedor
+      
       const fid = v.funcionario_id;
       if (fid) {
         if (!mapa[fid]) {
@@ -1502,7 +1504,7 @@ export default function App() {
     let totalFaturado = 0;
     
     relatorioVendas.forEach(v => {
-      if (v.forma_pagamento === "troca") return; // Ignorar vendas de troca no faturamento de caixa
+      if (v.devolvida) return; // Ignorar vendas devolvidas no faturamento do caixa
       
       const valor = Number(v.preco_vendido) || 0;
       totalFaturado += valor;
@@ -1522,29 +1524,6 @@ export default function App() {
       }
     });
 
-    relatorioTrocas.forEach(t => {
-      const valor = Number(t.diferenca_valor) || 0;
-      totalFaturado += valor;
-      
-      if (valor > 0) {
-        const match = t.motivo?.match(/Diferença paga via:\s*(\w+)/i);
-        const forma = match ? match[1].toLowerCase() : "pix";
-        
-        if (forma === "dinheiro") dinheiro += valor;
-        else if (forma === "debito") debito += valor;
-        else if (forma === "credito") credito += valor;
-        else if (forma === "pix") pix += valor;
-        else if (forma === "boleto") boleto += valor;
-        else if (forma === "credito_parcelado") credito_parcelado += valor;
-        else if (forma === "credito_a_vista") credito_a_vista += valor;
-        else if (forma === "voucher") voucher += valor;
-        else if (forma === "pix_online") pix_online += valor;
-        else {
-          pix += valor;
-        }
-      }
-    });
-
     return {
       dinheiro,
       debito,
@@ -1556,7 +1535,7 @@ export default function App() {
       voucher,
       pix_online,
       totalFaturado,
-      totalSair: relatorioVendas.length
+      totalSair: relatorioVendas.filter(v => !v.devolvida).length
     };
   }, [relatorioVendas, relatorioTrocas]);
 
@@ -1569,6 +1548,8 @@ export default function App() {
     });
 
     relatorioVendas.forEach(v => {
+      if (v.devolvida) return; // Ignorar vendas devolvidas no faturamento do vendedor
+      
       const fid = v.funcionario_id;
       if (fid) {
         if (!mapa[fid]) {
@@ -1589,16 +1570,10 @@ export default function App() {
     const anoAtual = dataReferencia.getFullYear();
     const mesAtual = dataReferencia.getMonth(); // 0-11
     
-    // Filtrar todas as vendas do mês
+    // Filtrar todas as vendas do mês (apenas as ativas, não devolvidas)
     const vendasMesAtual = vendas.filter(v => {
       const d = new Date(v.created_at);
-      return d.getFullYear() === anoAtual && d.getMonth() === mesAtual;
-    });
-
-    // Filtrar todas as trocas do mês
-    const trocasMesAtual = trocas.filter(t => {
-      const d = new Date(t.created_at || t.data);
-      return d.getFullYear() === anoAtual && d.getMonth() === mesAtual;
+      return d.getFullYear() === anoAtual && d.getMonth() === mesAtual && !v.devolvida;
     });
 
     const totalDiasMes = new Date(anoAtual, mesAtual + 1, 0).getDate();
@@ -1612,14 +1587,6 @@ export default function App() {
         const valor = Number(v.preco_vendido) || 0;
         faturamentoDia[dia] += valor;
         quantidadeDia[dia] += 1;
-      }
-    });
-
-    trocasMesAtual.forEach(t => {
-      const d = new Date(t.created_at || t.data);
-      const dia = d.getDate();
-      if (dia >= 1 && dia <= totalDiasMes) {
-        faturamentoDia[dia] += Number(t.diferenca_valor || 0);
       }
     });
 
