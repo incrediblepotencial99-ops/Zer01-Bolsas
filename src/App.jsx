@@ -5011,7 +5011,7 @@ export default function App() {
                                     </span>
                                   ) : Number(t.diferenca_valor) < 0 ? (
                                     <div className="flex flex-col gap-0.5">
-                                      <span className="font-bold text-sky-600 bg-sky-50 px-2 py-0.5 rounded border border-sky-100 w-fit text-[9px] uppercase tracking-wider block">Crédito</span>
+                                      <span className="font-bold text-sky-600 bg-sky-50 px-2 py-0.5 rounded border border-sky-100 w-fit text-[9px] uppercase tracking-wider block">Reembolso</span>
                                       <span className="text-sky-600 font-bold text-xs block">R$ {Math.abs(Number(t.diferenca_valor)).toFixed(2)}</span>
                                     </div>
                                   ) : (
@@ -5058,7 +5058,7 @@ export default function App() {
                                   </span>
                                 ) : Number(t.diferenca_valor) < 0 ? (
                                   <div className="flex flex-col items-end gap-0.5">
-                                    <span className="font-bold text-sky-600 bg-sky-50 px-1.5 py-0.5 rounded border border-sky-100 text-[8px] uppercase tracking-wider block">Crédito</span>
+                                    <span className="font-bold text-sky-600 bg-sky-50 px-1.5 py-0.5 rounded border border-sky-100 text-[8px] uppercase tracking-wider block">Reembolso</span>
                                     <span className="text-sky-600 font-bold text-xs block">- R$ {Math.abs(Number(t.diferenca_valor)).toFixed(2)}</span>
                                   </div>
                                 ) : (
