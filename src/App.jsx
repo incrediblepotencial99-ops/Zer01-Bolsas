@@ -1733,12 +1733,9 @@ export default function App() {
       vendasFiltro = vendas.filter(v => v.funcionario_id === dashboardVendedorFilter);
     }
 
-    let trocasFiltro = trocas;
-    if (dashboardVendedorFilter && dashboardVendedorFilter !== "all") {
-      trocasFiltro = trocas.filter(t => t.funcionario_id === dashboardVendedorFilter);
-    }
-
     vendasFiltro.forEach(v => {
+      if (v.devolvida) return; // Ignorar vendas devolvidas no faturamento real!
+      
       const chave = getLocalDateStr(v.created_at);
       if (!chave) return;
       
@@ -1749,18 +1746,8 @@ export default function App() {
       mapa[chave].quantidade += 1;
     });
 
-    trocasFiltro.forEach(t => {
-      const chave = getLocalDateStr(t.created_at || t.data);
-      if (!chave) return;
-      
-      if (!mapa[chave]) {
-        mapa[chave] = { total: 0, quantidade: 0 };
-      }
-      mapa[chave].total += Number(t.diferenca_valor || 0);
-    });
-
     return mapa;
-  }, [vendas, trocas, dashboardVendedorFilter]);
+  }, [vendas, dashboardVendedorFilter]);
 
   // Gráfico de faturamento dos últimos 7 dias (baseado na data selecionada no dashboard)
   const dadosGrafico7Dias = useMemo(() => {
