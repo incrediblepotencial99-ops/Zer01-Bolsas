@@ -1,0 +1,128 @@
+=== STRINGS EM CAIXA ALTA ENCONTRADAS ===
+Linha 628: 💵 DINHEIRO
+Linha 629: 💳 DÉBITO
+Linha 630: 💳 CRÉDITO
+Linha 631: 📱 PIX
+Linha 632: 📄 BOLETO
+Linha 633: 💳 CRÉDITO PARCELADO
+Linha 634: 💳 CRÉDITO À VISTA
+Linha 635: 🎟 VOUCHER
+Linha 636: 🌐 PIX ONLINE (SITE)
+Linha 1014: ZERO UM STOCK MANAGER
+Linha 1019: RELATÓRIO DIÁRIO
+Linha 1035: 💰 FATURAMENTO TOTAL
+Linha 1040: 📦 SAÍDAS DO PERÍODO
+Linha 1045: 🎯 TICKET MÉDIO
+Linha 1059: FORMA DE PAGAMENTO
+Linha 1062: BARRA VISUAL
+Linha 1107: POS.
+Linha 1143: ZERO UM STOCK MANAGER
+Linha 1148: RELATÓRIO DIÁRIO
+Linha 1164: 📥 ENTRADAS
+Linha 1169: 📤 SAÍDAS
+Linha 1174: 🔄 TROCAS
+Linha 1179: 🏛️ SALDO ESTOQUE
+Linha 1234: 🔄 QTD. DE TROCAS
+Linha 1244: 📈 NOVAS PEÇAS LEVADAS
+Linha 1253: ⚖️ SALDO FINANCEIRO DAS TROCAS
+Linha 1278: ZERO UM STOCK MANAGER
+Linha 1283: RELATÓRIO DIÁRIO
+Linha 1299: 📅 TOTAL DO DIA
+Linha 1304: 💰 TOTAL DO MÊS
+Linha 1309: 📆 DIAS COM VENDA
+Linha 1324: #16A34A
+Linha 1324: #DC2626
+Linha 2259: ZERO UM
+Linha 2323: (XX) 99999-9999
+Linha 2371: CRIAR CONTA PRINCIPAL
+Linha 2371: ACESSAR SISTEMA
+Linha 2406: 'FILL' 1
+Linha 2406: 'FILL' 0
+Linha 2430: 'FILL' 1
+Linha 2430: 'FILL' 0
+Linha 2948: #D12D6C
+Linha 2949: #D12D6C
+Linha 2954: #FCEEF3
+Linha 2955: #FCEEF3
+Linha 2956: #FCEEF3
+Linha 2962: #D12D6C
+Linha 3737: ESTOQUE MÍNIMO
+Linha 4616: OBSERVAÇÕES / NOTAS
+Linha 4660: (XX) 99999-9999
+Linha 4919: (XX) 99999-9999
+Linha 5285: R$ 0.00
+Linha 5429: DATA DE INÍCIO
+Linha 5439: DATA DE FIM
+Linha 5465: ZERO UM
+Linha 5545: #10B981
+Linha 5545: #D1D5DB
+Linha 5982: ZERO UM
+Linha 6714: R$ 0.00
+
+=== POSSÍVEIS ERROS DE PORTUGUÊS / TEXTO SEM ACENTO ===
+Linha 140: 'Quantidade máxima em estoque atingida para ${bolsa.nome} (${bolsa.quantidade} un).' -> verificar 'quantidade'
+Linha 171: 'Quantidade máxima em estoque atingida (${item.stock} un).' -> verificar 'quantidade'
+Linha 188: 'funcionario' -> verificar 'funcionário'
+Linha 318: 'funcionario' -> verificar 'funcionário'
+Linha 321: 'funcionario' -> verificar 'funcionário'
+Linha 321: 'funcionarios' -> verificar 'funcionários'
+Linha 348: '*, bolsas(nome, codigo), clientes(nome), profiles(nome)' -> verificar 'código'
+Linha 533: 'Produto Deletado' -> verificar 'deletado'
+Linha 1102: 'Ranking de faturamento e quantidade vendida por colaborador no período' -> verificar 'quantidade'
+Linha 1107: 'POS.' -> verificar 'pois'
+Linha 1124: '${v.quantidade} un' -> verificar 'quantidade'
+Linha 1441: 'codigo' -> verificar 'código'
+Linha 1587: 'Estoque insuficiente para o produto: ${item.nome}! (Estoque disponível: ${bolsa ? bolsa.quantidade : 0})' -> verificar 'quantidade'
+Linha 1647: '${formVenda.observacao}${descManualTotal > 0 && index === 0 ?' -> verificar 'observação'
+Linha 1828: 'b.quantidade' -> verificar 'quantidade'
+Linha 1962: 'funcionario' -> verificar 'funcionário'
+Linha 2040: 'funcionario' -> verificar 'funcionário'
+Linha 2518: 'funcionarios' -> verificar 'funcionários'
+Linha 2556: 'funcionarios' -> verificar 'funcionários'
+Linha 2565: 'funcionarios' -> verificar 'funcionários'
+Linha 2574: 'funcionarios' -> verificar 'funcionários'
+Linha 2652: 'funcionarios' -> verificar 'funcionários'
+Linha 2696: '{funcionarios.length} colaboradores online' -> verificar 'funcionários'
+Linha 2982: '{p.data.quantidade} {p.data.quantidade === 1 ? 'venda' : 'vendas'}' -> verificar 'quantidade'
+Linha 3068: '{pct.toFixed(1)}% ({v.quantidade} un)' -> verificar 'quantidade'
+Linha 3124: '${dados.quantidade} ${dados.quantidade === 1 ? "venda realizada" : "vendas realizadas"}' -> verificar 'quantidade'
+Linha 3223: '{d.quantidade} {d.quantidade === 1 ? "venda" : "vendas"}' -> verificar 'quantidade'
+Linha 3445: 'Pos.' -> verificar 'pois'
+Linha 3504: '{p.codigo}' -> verificar 'código'
+Linha 3508: '{p.quantidade} un' -> verificar 'quantidade'
+Linha 3547: '{p.codigo}' -> verificar 'código'
+Linha 3551: '{p.quantidade} un' -> verificar 'quantidade'
+Linha 3727: 'QUANTIDADE' -> verificar 'quantidade'
+Linha 4060: 'Produto deletado com sucesso!' -> verificar 'deletado'
+Linha 4205: 'Produto deletado com sucesso!' -> verificar 'deletado'
+Linha 4353: 'Produto deletado com sucesso!' -> verificar 'deletado'
+Linha 4700: 'Cód: {v.bolsas?.codigo || "N/A"}' -> verificar 'código'
+Linha 4777: 'Cód: {v.bolsas?.codigo || "N/A"}' -> verificar 'código'
+Linha 5030: 'Cliente deletado!' -> verificar 'deletado'
+Linha 5034: 'Excluir Cliente' -> verificar 'excluir'
+Linha 5268: 'Cód: {t.devolvida?.codigo}' -> verificar 'código'
+Linha 5272: 'Cód: {t.nova?.codigo}' -> verificar 'código'
+Linha 5335: 'Cód: {t.devolvida?.codigo}' -> verificar 'código'
+Linha 5340: 'Cód: {t.nova?.codigo}' -> verificar 'código'
+Linha 5580: 'Relatório analítico de faturamento e quantidade vendida por cada vendedor no período selecionado.' -> verificar 'quantidade'
+Linha 5771: '{ent.bolsas?.codigo || ""}' -> verificar 'código'
+Linha 5856: '{troca.devolvida?.codigo || ""}' -> verificar 'código'
+Linha 5860: '{troca.nova?.codigo || ""}' -> verificar 'código'
+Linha 5923: '{v.bolsas?.codigo || ""}' -> verificar 'código'
+Linha 6009: 'funcionarios' -> verificar 'funcionários'
+Linha 6071: 'funcionario' -> verificar 'funcionário'
+Linha 6109: 'funcionario' -> verificar 'funcionário'
+Linha 6198: 'funcionario' -> verificar 'funcionário'
+Linha 6211: 'funcionario' -> verificar 'funcionário'
+Linha 6641: 'Produto Deletado' -> verificar 'deletado'
+Linha 6724: '{t.devolvida?.nome || "Produto Deletado"}' -> verificar 'deletado'
+Linha 6725: 'Cód: {t.devolvida?.codigo || "-"}' -> verificar 'código'
+Linha 6731: '{t.nova?.nome || "Produto Deletado"}' -> verificar 'deletado'
+Linha 6732: 'Cód: {t.nova?.codigo || "-"}' -> verificar 'código'
+
+=== MENSAGENS DE ALERT / TOAST DUPLICADAS ===
+Mensagem: 'Resumo copiado para a área de transferência!' duplicada nas linhas [587, 604]
+Mensagem: 'Deseja realmente deletar o produto ${b.nome}?' duplicada nas linhas [4057, 4202, 4350]
+Mensagem: 'Erro ao deletar:' duplicada nas linhas [4059, 4204, 4352, 5029]
+Mensagem: 'Produto deletado com sucesso!' duplicada nas linhas [4060, 4205, 4353]
+Mensagem: 'Erro ao atualizar vendedor:' duplicada nas linhas [4719, 4826]

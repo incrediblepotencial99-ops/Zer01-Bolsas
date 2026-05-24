@@ -1,0 +1,249 @@
+/* Clear index.css to allow Tailwind CDN styles from Stitch to render perfectly */
+html, body, button, input, select, textarea, span, p, div {
+  -webkit-font-smoothing: antialiased !important;
+  -moz-osx-font-smoothing: grayscale !important;
+  text-rendering: optimizeLegibility !important;
+}
+
+body {
+  margin: 0;
+  font-family: 'Inter', sans-serif;
+  background-color: #FCFAF9;
+}
+
+/* ========================================================================== */
+/* SISTEMA DE ALTO CONTRASTE E RENDERIZAÇÃO PREMIUM (FUNDO CLARO)             */
+/* ========================================================================== */
+
+/* Evita que botões principais grandes 'h-12' sofram esmagamento ou pixelagem */
+button.h-12, label.h-12 {
+  height: auto !important;
+  min-height: 3rem !important; /* 48px */
+  padding-top: 0.75rem !important;
+  padding-bottom: 0.75rem !important;
+  padding-left: 1.25rem !important;
+  padding-right: 1.25rem !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-sizing: border-box !important;
+  white-space: normal !important;
+  text-align: center !important;
+}
+
+/* Evita que botões secundários ou de grade menores 'h-11', 'h-10' sofram esmagamento */
+button.h-11, button.h-10, label.h-11, label.h-10 {
+  height: auto !important;
+  min-height: 2.5rem !important; /* 40px */
+  padding-top: 0.5rem !important;
+  padding-bottom: 0.5rem !important;
+  padding-left: 0.35rem !important; /* Padding lateral compacto para máximo espaço de texto horizontal */
+  padding-right: 0.35rem !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-sizing: border-box !important;
+  white-space: normal !important;
+  text-align: center !important;
+}
+
+/* Inputs, Selects e Textareas - Alto Contraste Marcante, Sem Cinza Lavado */
+input, select, textarea {
+  border-color: rgba(41, 20, 27, 0.4) !important; /* Contorno nítido chocolate escuro, altamente visível */
+  box-shadow: 0 2px 6px rgba(41, 20, 27, 0.06) !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+input:hover, select:hover, textarea:hover {
+  border-color: rgba(41, 20, 27, 0.65) !important;
+}
+
+input:focus, select:focus, textarea:focus {
+  border-color: #D12D6C !important;
+  box-shadow: 0 0 0 2px rgba(209, 45, 108, 0.15), 0 2px 8px rgba(41, 20, 27, 0.1) !important;
+}
+
+/* Placeholders muito mais visíveis e nítidos (acaba com o cinza invisível) */
+input::placeholder, textarea::placeholder {
+  color: rgba(41, 20, 27, 0.55) !important;
+  opacity: 1 !important;
+}
+
+/* Escurecimento marcante das bordas muito claras do Tailwind (#EACAD6) por contornos nítidos */
+.border-\[\#EACAD6\],
+.border-2.border-\[\#EACAD6\] {
+  border-color: rgba(41, 20, 27, 0.4) !important;
+  box-shadow: 0 2px 6px rgba(41, 20, 27, 0.08) !important;
+  transition: all 0.2s ease-in-out !important;
+}
+
+/* Efeito de hover e clique para botões com bordas da marca */
+button.border-\[\#EACAD6\]:hover,
+label.border-\[\#EACAD6\]:hover {
+  border-color: rgba(41, 20, 27, 0.65) !important;
+  background-color: rgba(41, 20, 27, 0.03) !important;
+  box-shadow: 0 4px 10px rgba(41, 20, 27, 0.12) !important;
+}
+
+/* Divisórias secundárias nas tabelas e cards */
+.border-\[\#EACAD6\/60\],
+.border-\[\#EACAD6\/40\],
+.border-\[\#EACAD6\/30\] {
+  border-color: rgba(41, 20, 27, 0.2) !important;
+}
+
+.border-t.border-\[\#FCEEF3\],
+.border-b.border-\[\#FCEEF3\],
+.border-\[\#FCEEF3\] {
+  border-color: rgba(41, 20, 27, 0.15) !important;
+}
+
+/* Textos de apoio e notas em alta definição (combate o cinza lavado que cansa as vistas) */
+.text-\[\#29141B\/60\], 
+.text-\[\#29141B\/50\],
+.text-\[\#29141B\/75\] {
+  color: rgba(41, 20, 27, 0.78) !important; /* Aumentado de ~50% para 78% de contraste */
+}
+
+/* ========================================================================== */
+/* BOTÕES PRINCIPAIS - PROFUNDIDADE, RELEVO 3D E FEEDBACK PREMIUM              */
+/* ========================================================================== */
+button.bg-\[\#D12D6C\],
+.bg-secondary-container {
+  box-shadow: 0 4px 12px rgba(209, 45, 108, 0.25), 0 2px 4px rgba(41, 20, 27, 0.15) !important;
+  border: 1px solid rgba(41, 20, 27, 0.1) !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+button.bg-\[\#D12D6C\]:hover,
+.bg-secondary-container:hover {
+  box-shadow: 0 6px 16px rgba(209, 45, 108, 0.35), 0 3px 6px rgba(41, 20, 27, 0.2) !important;
+  transform: translateY(-1px) !important;
+}
+
+button.bg-\[\#D12D6C\]:active,
+.bg-secondary-container:active {
+  box-shadow: 0 2px 6px rgba(209, 45, 108, 0.15), 0 1px 2px rgba(41, 20, 27, 0.1) !important;
+  transform: translateY(0) !important;
+}
+
+/* ========================================================================== */
+/* LAYOUT E RESPONSIVIDADE                                                    */
+/* ========================================================================== */
+
+/* Aumento do Padding Lateral Global no Mobile para garantir sobra nas bordas */
+@media (max-width: 767px) {
+  .p-container-padding {
+    padding: 1.5rem !important; /* Aumenta a sobra lateral de 20px para 24px */
+  }
+}
+
+/* ========================================================================== */
+/* ESTILOS DE IMPRESSÃO — RELATÓRIO PREMIUM A4                                */
+/* ========================================================================== */
+
+@media print {
+  /* Configuração da página A4 */
+  @page {
+    size: A4 portrait;
+    margin: 12mm 15mm 15mm 15mm;
+  }
+
+  /* Reset geral para impressão limpa */
+  body {
+    background: white !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+    font-size: 11px !important;
+    line-height: 1.4 !important;
+  }
+
+  /* Forçar fundo branco em todos os containers */
+  * {
+    box-shadow: none !important;
+  }
+
+  /* Arredondamento sutil para impressão (menos que tela) */
+  .rounded-\[24px\], .rounded-3xl {
+    border-radius: 8px !important;
+  }
+  .rounded-2xl {
+    border-radius: 6px !important;
+  }
+
+  /* Controle de quebra de página */
+  .print-page-break {
+    page-break-before: always !important;
+    break-before: page !important;
+  }
+  .print-avoid-break {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* Remover animações */
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  /* Tabelas de impressão */
+  .print-table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    font-size: 10px !important;
+  }
+  .print-table th {
+    background-color: #F9FAFB !important;
+    border-bottom: 2px solid #29141B !important;
+    padding: 6px 8px !important;
+    text-align: left !important;
+    font-weight: 800 !important;
+    font-size: 8px !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.08em !important;
+    color: rgba(41, 20, 27, 0.7) !important;
+  }
+  .print-table td {
+    padding: 5px 8px !important;
+    border-bottom: 1px solid rgba(41, 20, 27, 0.12) !important;
+    color: #29141B !important;
+  }
+  .print-table tr:nth-child(even) td {
+    background-color: #FAFAFA !important;
+  }
+  .print-table .total-row td {
+    border-top: 2px solid #29141B !important;
+    font-weight: 800 !important;
+    background: #F9FAFB !important;
+  }
+
+  /* KPI cards de impressão */
+  .print-kpi-card {
+    border: 1px solid rgba(41, 20, 27, 0.2) !important;
+    border-radius: 6px !important;
+    padding: 10px 12px !important;
+    page-break-inside: avoid !important;
+  }
+  .print-kpi-card-accent {
+    border-left: 3px solid #D12D6C !important;
+  }
+
+  /* Seções de impressão */
+  .print-section {
+    margin-bottom: 16px !important;
+    page-break-inside: avoid !important;
+  }
+  .print-section-title {
+    font-size: 13px !important;
+    font-weight: 800 !important;
+    color: #D12D6C !important;
+    border-bottom: 2px solid rgba(209, 45, 108, 0.3) !important;
+    padding-bottom: 4px !important;
+    margin-bottom: 10px !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+  }
+}
