@@ -25,7 +25,9 @@ export const gerarRelatorioHtml = ({
   totalNovo,
   saldoTrocasConsolidado,
   totalDescontos,
-  faturamentoBruto
+  faturamentoBruto,
+  totalEntradasPeriodo,
+  relatorioTrocas
 }) => {
   // --- CONSTRUÇÃO DO HTML DAS TABELAS ---
 

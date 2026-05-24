@@ -747,7 +747,9 @@ export default function App() {
       totalNovo,
       saldoTrocasConsolidado,
       totalDescontos,
-      faturamentoBruto
+      faturamentoBruto,
+      totalEntradasPeriodo,
+      relatorioTrocas
     });
 
     // Criar ou obter o container para a impressão
