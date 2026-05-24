@@ -93,6 +93,8 @@ export default function App() {
   const [editingBolsa, setEditingBolsa] = useState(null);
   const [selectedBolsaForView, setSelectedBolsaForView] = useState(null);
   const [selectedClienteForHistory, setSelectedClienteForHistory] = useState(null);
+  const [dossieComprasOpen, setDossieComprasOpen] = useState(true);
+  const [dossieTrocasOpen, setDossieTrocasOpen] = useState(false);
   
   const [formVenda, setFormVenda] = useState({
     bolsa_id: "", cliente_id: "", preco_vendido: "", observacao: "", forma_pagamento: "dinheiro", funcionario_id: ""
@@ -4600,7 +4602,11 @@ export default function App() {
                             
                             <div className="flex items-center gap-1.5">
                               <button 
-                                onClick={() => setSelectedClienteForHistory(c)}
+                                onClick={() => {
+                                  setSelectedClienteForHistory(c);
+                                  setDossieComprasOpen(true);
+                                  setDossieTrocasOpen(false);
+                                }}
                                 className="p-1.5 rounded-lg bg-[#FCFAF9] border border-[#EACAD6] text-[#29141B] hover:text-[#D12D6C] transition-all flex items-center justify-center shadow-xs"
                                 title="Ver Histórico de Compras"
                               >
@@ -6442,7 +6448,7 @@ export default function App() {
                 {/* Close Button */}
                 <button 
                   onClick={() => setSelectedClienteForHistory(null)}
-                  className="absolute top-4 right-4 z-20 w-8 h-8 rounded-full bg-white hover:bg-[#29141B]/[0.03] border border-[#EACAD6] flex items-center justify-center text-[#29141B] hover:text-red-500 transition-colors shadow-sm"
+                  className="absolute top-4 right-4 z-20 w-8 h-8 rounded-full bg-white hover:bg-[#29141B]/[0.03] border border-[#EACAD6] flex items-center justify-center text-[#29141B] hover:text-red-500 transition-colors shadow-sm cursor-pointer"
                   title="Fechar"
                 >
                   <span className="material-symbols-outlined text-lg">close</span>
@@ -6468,144 +6474,206 @@ export default function App() {
                   
                   {/* Stats Cards (Mini Bento Grid) */}
                   <div className="grid grid-cols-3 gap-3">
-                    <div className="bg-[#FCFAF9] border border-[#EACAD6] rounded-2xl p-3.5 flex flex-col justify-between shadow-sm border-l-4 border-l-indigo-500">
+                    <div className="bg-[#FCFAF9] border border-[#EACAD6] rounded-2xl p-3.5 flex flex-col justify-between shadow-sm border-l-4 border-l-[#29141B]/30">
                       <span className="text-[9px] uppercase tracking-wider text-[#29141B]/70 font-extrabold">Total Compras</span>
-                      <span className="text-xl font-black text-indigo-600 mt-1">{clientSales.length} un.</span>
+                      <span className="text-xl font-black text-[#29141B] mt-1">{clientSales.length} un.</span>
                     </div>
-                    <div className="bg-[#FCFAF9] border border-[#EACAD6] rounded-2xl p-3.5 flex flex-col justify-between shadow-sm border-l-4 border-l-emerald-500">
+                    <div className="bg-[#FCFAF9] border border-[#C9A84C]/45 rounded-2xl p-3.5 flex flex-col justify-between shadow-sm border-l-4 border-l-[#C9A84C]">
                       <span className="text-[9px] uppercase tracking-wider text-[#29141B]/70 font-extrabold">Total Investido</span>
                       <span className="text-xl font-black text-emerald-700 mt-1">R$ {totalSpent.toFixed(2)}</span>
                     </div>
-                    <div className="bg-[#FCFAF9] border border-[#EACAD6] rounded-2xl p-3.5 flex flex-col justify-between shadow-sm border-l-4 border-l-amber-500">
+                    <div className="bg-[#FCFAF9] border border-[#C9A84C]/45 rounded-2xl p-3.5 flex flex-col justify-between shadow-sm border-l-4 border-l-[#C9A84C]">
                       <span className="text-[9px] uppercase tracking-wider text-[#29141B]/70 font-extrabold">Trocas Efetuadas</span>
                       <span className="text-xl font-black text-amber-700 mt-1">{clientExchanges.length} un.</span>
                     </div>
                   </div>
 
-                  {/* ── SALES HISTORY ── */}
-                  <div className="flex flex-col gap-3">
-                    <h3 className="text-xs uppercase font-extrabold tracking-widest text-[#29141B] flex items-center gap-1.5 border-b border-[#EACAD6] pb-2">
-                      <span className="material-symbols-outlined text-sm text-indigo-600">shopping_bag</span>
-                      Histórico de Compras ({clientSales.length})
-                    </h3>
+                  {/* ── SALES HISTORY GAVETA ── */}
+                  <div className="flex flex-col gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setDossieComprasOpen(!dossieComprasOpen)}
+                      className="w-full flex items-center justify-between py-3 px-4 bg-[#FCFAF9] hover:bg-[#FFEBF2]/40 border border-[#EACAD6] rounded-2xl text-xs text-[#29141B] font-bold transition-all duration-200 cursor-pointer select-none outline-none"
+                    >
+                      <span className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-[18px] text-[#D12D6C]">shopping_bag</span>
+                        Compras Ativas ({clientSales.length})
+                      </span>
+                      <span 
+                        className="material-symbols-outlined text-[18px] text-[#29141B]/60 transition-transform duration-300"
+                        style={{ transform: dossieComprasOpen ? "rotate(180deg)" : "rotate(0deg)" }}
+                      >
+                        keyboard_arrow_down
+                      </span>
+                    </button>
                     
-                    <div className="flex flex-col gap-2 max-h-[220px] overflow-y-auto pr-1">
-                      {clientSales.map(v => (
-                        <div key={v.id} className="bg-[#FCFAF9] border border-[#EACAD6]/60 rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 hover:bg-[#FCFAF9]/80 transition-colors">
-                          <div className="flex items-start gap-3">
-                            <div className="w-8 h-8 rounded-lg bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shrink-0 mt-0.5">
-                              <span className="material-symbols-outlined text-base">check_circle</span>
-                            </div>
-                            <div className="flex flex-col">
-                              <span className="text-xs font-bold text-[#29141B] leading-tight">
-                                {v.bolsas?.nome || "Produto Excluído"}
-                              </span>
-                              <span className="text-[10px] text-[#29141B]/75 mt-0.5">
-                                Cód: {v.bolsas?.codigo || "-"} • Atendido por: {v.profiles?.nome || "Sistema"}
-                              </span>
-                              {v.observacao && (
-                                <span className="text-[10px] italic text-[#29141B]/80 mt-1 bg-white p-1.5 rounded border border-[#EACAD6]/40">
-                                  Obs: {v.observacao}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                          
-                          <div className="flex flex-col items-end shrink-0 border-t sm:border-t-0 border-[#EACAD6]/30 pt-2 sm:pt-0">
-                            <span className="text-sm font-black text-[#29141B]">
-                              R$ {Number(v.preco_vendido).toFixed(2)}
-                            </span>
-                            <span className="text-[9px] text-[#29141B]/60 font-mono mt-0.5">
-                              {new Date(v.created_at || v.data).toLocaleString("pt-BR", {
-                                day: "2-digit",
-                                month: "2-digit",
-                                year: "numeric",
-                                hour: "2-digit",
-                                minute: "2-digit"
-                              })}
-                            </span>
-                            {v.tinha_desconto && (
-                              <span className="bg-green-500/10 border border-green-500/30 text-green-600 text-[8px] font-bold px-1.5 py-0.5 rounded mt-1">
-                                Desc. R$ {Number(v.desconto_valor).toFixed(2)}
-                              </span>
+                    <AnimatePresence>
+                      {dossieComprasOpen && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: "auto", opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.25, ease: "easeInOut" }}
+                          className="overflow-hidden"
+                        >
+                          <div className="flex flex-col gap-2 max-h-[220px] overflow-y-auto pr-1 mt-1 bg-[#FCFAF9]/40 border border-[#EACAD6]/20 p-2 rounded-2xl">
+                            {clientSales.map(v => {
+                              const cleanObs = v.observacao ? v.observacao.split(" [Trocada/Devolvida:")[0].split(" [Saída de Troca:")[0].trim() : "";
+                              const isExchangeOut = v.observacao && v.observacao.includes("[Saída de Troca:");
+                              return (
+                                <div key={v.id} className="bg-white border border-[#EACAD6]/40 rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 hover:bg-[#FCFAF9]/80 transition-colors">
+                                  <div className="flex items-start gap-3">
+                                    <div className="w-8 h-8 rounded-lg bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shrink-0 mt-0.5">
+                                      <span className="material-symbols-outlined text-base">check_circle</span>
+                                    </div>
+                                    <div className="flex flex-col">
+                                      <div className="flex items-center gap-1.5 flex-wrap">
+                                        <span className="text-xs font-bold text-[#29141B] leading-tight">
+                                          {v.bolsas?.nome || "Produto Excluído"}
+                                        </span>
+                                        {isExchangeOut && (
+                                          <span className="text-[8px] bg-sky-50 border border-sky-200 text-sky-600 font-extrabold uppercase px-1.5 py-0.5 rounded shrink-0">
+                                            Troca
+                                          </span>
+                                        )}
+                                      </div>
+                                      <span className="text-[10px] text-[#29141B]/75 mt-0.5">
+                                        Cód: {v.bolsas?.codigo || "-"} • Atendido por: {v.profiles?.nome || "Sistema"}
+                                      </span>
+                                      {cleanObs && (
+                                        <span className="text-[10px] italic text-[#29141B]/80 mt-1 bg-[#FCFAF9] p-1.5 rounded border border-[#EACAD6]/30">
+                                          Obs: {cleanObs}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                  
+                                  <div className="flex flex-col items-end shrink-0 border-t sm:border-t-0 border-[#EACAD6]/30 pt-2 sm:pt-0">
+                                    <span className="text-sm font-black text-[#29141B]">
+                                      R$ {Number(v.preco_vendido).toFixed(2)}
+                                    </span>
+                                    <span className="text-[9px] text-[#29141B]/60 font-mono mt-0.5">
+                                      {new Date(v.created_at || v.data).toLocaleString("pt-BR", {
+                                        day: "2-digit",
+                                        month: "2-digit",
+                                        year: "numeric",
+                                        hour: "2-digit",
+                                        minute: "2-digit"
+                                      })}
+                                    </span>
+                                    {v.tinha_desconto && (
+                                      <span className="bg-[#D12D6C]/10 border border-[#D12D6C]/30 text-[#D12D6C] text-[8px] font-bold px-1.5 py-0.5 rounded mt-1">
+                                        Desc. R$ {Number(v.desconto_valor).toFixed(2)}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                            {clientSales.length === 0 && (
+                              <div className="text-center text-[#29141B]/60 text-[11px] py-6 bg-white rounded-xl border border-dashed border-[#EACAD6]">
+                                Nenhuma compra registrada para este cliente.
+                              </div>
                             )}
                           </div>
-                        </div>
-                      ))}
-                      {clientSales.length === 0 && (
-                        <div className="text-center text-[#29141B]/60 text-[11px] py-6 bg-[#FCFAF9] rounded-xl border border-dashed border-[#EACAD6]">
-                          Nenhuma compra registrada para este cliente.
-                        </div>
+                        </motion.div>
                       )}
-                    </div>
+                    </AnimatePresence>
                   </div>
 
-                  {/* ── EXCHANGE HISTORY ── */}
-                  <div className="flex flex-col gap-3">
-                    <h3 className="text-xs uppercase font-extrabold tracking-widest text-[#29141B] flex items-center gap-1.5 border-b border-[#EACAD6] pb-2">
-                      <span className="material-symbols-outlined text-sm text-amber-700">swap_horiz</span>
-                      Histórico de Trocas ({clientExchanges.length})
-                    </h3>
+                  {/* ── EXCHANGE HISTORY GAVETA ── */}
+                  <div className="flex flex-col gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setDossieTrocasOpen(!dossieTrocasOpen)}
+                      className="w-full flex items-center justify-between py-3 px-4 bg-[#FCFAF9] hover:bg-[#FFEBF2]/40 border border-[#EACAD6] rounded-2xl text-xs text-[#29141B] font-bold transition-all duration-200 cursor-pointer select-none outline-none"
+                    >
+                      <span className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-[18px] text-amber-700">swap_horiz</span>
+                        Trocas & Devoluções ({clientExchanges.length})
+                      </span>
+                      <span 
+                        className="material-symbols-outlined text-[18px] text-[#29141B]/60 transition-transform duration-300"
+                        style={{ transform: dossieTrocasOpen ? "rotate(180deg)" : "rotate(0deg)" }}
+                      >
+                        keyboard_arrow_down
+                      </span>
+                    </button>
                     
-                    <div className="flex flex-col gap-2 max-h-[220px] overflow-y-auto pr-1">
-                      {clientExchanges.map(t => (
-                        <div key={t.id} className="bg-[#FCFAF9] border border-[#EACAD6]/60 rounded-xl p-3.5 flex flex-col gap-2.5 hover:bg-[#FCFAF9]/80 transition-colors">
-                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                            <div className="flex items-center gap-2">
-                              <span className="bg-amber-500/10 border border-amber-500/30 text-amber-600 text-[9px] px-2 py-0.5 rounded font-bold uppercase tracking-wider">
-                                Troca {t.status || "pendente"}
-                              </span>
-                              <span className="text-[10px] text-[#29141B]/70 font-mono">
-                                {new Date(t.created_at || t.data).toLocaleString("pt-BR", {
-                                  day: "2-digit",
-                                  month: "2-digit",
-                                  year: "numeric",
-                                  hour: "2-digit",
-                                  minute: "2-digit"
-                                })}
-                              </span>
-                            </div>
-                            <span className="text-xs font-bold text-[#29141B]">
-                              {Number(t.diferenca_valor) > 0 ? (
-                                <span>Diferença a Pagar: <span className="text-green-600 font-bold">R$ {Number(t.diferenca_valor).toFixed(2)}</span></span>
-                              ) : Number(t.diferenca_valor) < 0 ? (
-                                <span>Reembolso Cliente: <span className="text-amber-600 font-bold">R$ {Math.abs(Number(t.diferenca_valor)).toFixed(2)}</span></span>
-                              ) : (
-                                <span>Diferença: <span className="text-[#29141B]/60 font-normal">R$ 0.00</span></span>
-                              )}
-                            </span>
-                          </div>
+                    <AnimatePresence>
+                      {dossieTrocasOpen && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: "auto", opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.25, ease: "easeInOut" }}
+                          className="overflow-hidden"
+                        >
+                          <div className="flex flex-col gap-2 max-h-[220px] overflow-y-auto pr-1 mt-1 bg-[#FCFAF9]/40 border border-[#EACAD6]/20 p-2 rounded-2xl">
+                            {clientExchanges.map(t => {
+                              const statusTraduzido = t.status === "concluida" ? "Troca Concluída" : t.status === "cancelada" ? "Troca Cancelada" : "Troca Pendente";
+                              return (
+                                <div key={t.id} className="bg-white border border-[#EACAD6]/60 rounded-xl p-3.5 flex flex-col gap-2.5 hover:bg-[#FCFAF9]/80 transition-colors">
+                                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                    <div className="flex items-center gap-2">
+                                      <span className="bg-amber-500/10 border border-amber-500/30 text-amber-600 text-[9px] px-2 py-0.5 rounded font-bold uppercase tracking-wider">
+                                        {statusTraduzido}
+                                      </span>
+                                      <span className="text-[10px] text-[#29141B]/70 font-mono">
+                                        {new Date(t.created_at || t.data).toLocaleString("pt-BR", {
+                                          day: "2-digit",
+                                          month: "2-digit",
+                                          year: "numeric",
+                                          hour: "2-digit",
+                                          minute: "2-digit"
+                                        })}
+                                      </span>
+                                    </div>
+                                    <span className="text-xs font-bold text-[#29141B]">
+                                      {Number(t.diferenca_valor) > 0 ? (
+                                        <span>Diferença a Pagar: <span className="text-green-600 font-bold">R$ {Number(t.diferenca_valor).toFixed(2)}</span></span>
+                                      ) : Number(t.diferenca_valor) < 0 ? (
+                                        <span>Reembolso Cliente: <span className="text-amber-600 font-bold">R$ {Math.abs(Number(t.diferenca_valor)).toFixed(2)}</span></span>
+                                      ) : (
+                                        <span>Diferença: <span className="text-[#29141B]/60 font-normal">R$ 0.00</span></span>
+                                      )}
+                                    </span>
+                                  </div>
 
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs border-t border-b border-[#EACAD6]/40 py-2 bg-white px-2 rounded-lg">
-                            <div className="flex flex-col gap-0.5">
-                              <span className="text-[8px] uppercase tracking-wider text-rose-700 font-extrabold flex items-center gap-0.5">
-                                <span className="material-symbols-outlined text-[10px]">arrow_downward</span> Devolvido
-                              </span>
-                              <span className="font-bold text-[#29141B] line-clamp-1">{t.devolvida?.nome || "Produto Excluído"}</span>
-                              <span className="text-[9px] text-[#29141B]/70">Cód: {t.devolvida?.codigo || "-"}</span>
-                            </div>
-                            <div className="flex flex-col gap-0.5 border-t sm:border-t-0 sm:border-l border-[#EACAD6]/30 pt-2 sm:pt-0 sm:pl-3">
-                              <span className="text-[8px] uppercase tracking-wider text-green-600 font-extrabold flex items-center gap-0.5">
-                                <span className="material-symbols-outlined text-[10px]">arrow_upward</span> Entregue
-                              </span>
-                              <span className="font-bold text-[#29141B] line-clamp-1">{t.nova?.nome || "Produto Excluído"}</span>
-                              <span className="text-[9px] text-[#29141B]/70">Cód: {t.nova?.codigo || "-"}</span>
-                            </div>
-                          </div>
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs border-t border-b border-[#EACAD6]/40 py-2 bg-white px-2 rounded-lg">
+                                    <div className="flex flex-col gap-0.5">
+                                      <span className="text-[8px] uppercase tracking-wider text-rose-700 font-extrabold flex items-center gap-0.5">
+                                        <span className="material-symbols-outlined text-[10px]">arrow_downward</span> Devolvido
+                                      </span>
+                                      <span className="font-bold text-[#29141B] line-clamp-1">{t.devolvida?.nome || "Produto Excluído"}</span>
+                                      <span className="text-[9px] text-[#29141B]/70">Cód: {t.devolvida?.codigo || "-"}</span>
+                                    </div>
+                                    <div className="flex flex-col gap-0.5 border-t sm:border-t-0 sm:border-l border-[#EACAD6]/30 pt-2 sm:pt-0 sm:pl-3">
+                                      <span className="text-[8px] uppercase tracking-wider text-green-600 font-extrabold flex items-center gap-0.5">
+                                        <span className="material-symbols-outlined text-[10px]">arrow_upward</span> Entregue
+                                      </span>
+                                      <span className="font-bold text-[#29141B] line-clamp-1">{t.nova?.nome || "Produto Excluído"}</span>
+                                      <span className="text-[9px] text-[#29141B]/70">Cód: {t.nova?.codigo || "-"}</span>
+                                    </div>
+                                  </div>
 
-                          {t.motivo && (
-                            <p className="text-[10px] text-[#29141B]/80 bg-white p-2 rounded border border-[#EACAD6]/40 italic">
-                              Motivo: {t.motivo}
-                            </p>
-                          )}
-                        </div>
-                      ))}
-                      {clientExchanges.length === 0 && (
-                        <div className="text-center text-[#29141B]/60 text-[11px] py-6 bg-[#FCFAF9] rounded-xl border border-dashed border-[#EACAD6]">
-                          Nenhuma troca registrada para este cliente.
-                        </div>
+                                  {t.motivo && (
+                                    <p className="text-[10px] text-[#29141B]/80 bg-[#FCFAF9] p-2 rounded border border-[#EACAD6]/30 italic">
+                                      Motivo: {t.motivo}
+                                    </p>
+                                  )}
+                                </div>
+                              );
+                            })}
+                            {clientExchanges.length === 0 && (
+                              <div className="text-center text-[#29141B]/60 text-[11px] py-6 bg-white rounded-xl border border-dashed border-[#EACAD6]">
+                                Nenhuma troca registrada para este cliente.
+                              </div>
+                            )}
+                          </div>
+                        </motion.div>
                       )}
-                    </div>
+                    </AnimatePresence>
                   </div>
 
                 </div>
@@ -6614,7 +6682,7 @@ export default function App() {
                 <div className="p-4 border-t border-[#EACAD6] flex items-center justify-end bg-[#FCFAF9] gap-2 shrink-0">
                   <button 
                     onClick={() => setSelectedClienteForHistory(null)}
-                    className="bg-white hover:bg-[#29141B]/[0.03] text-[#29141B] border border-[#EACAD6] hover:border-[#29141B]/50 px-5 py-2 rounded-xl text-xs font-bold shadow-sm transition-all active:scale-95"
+                    className="bg-white hover:bg-[#29141B]/[0.03] text-[#29141B] border border-[#EACAD6] hover:border-[#29141B]/50 px-5 py-2 rounded-xl text-xs font-bold shadow-sm transition-all active:scale-95 cursor-pointer"
                   >
                     Fechar
                   </button>
