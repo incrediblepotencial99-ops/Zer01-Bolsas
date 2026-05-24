@@ -9,6 +9,7 @@ import { supabase } from "./supabaseClient";
 import { createClient } from "@supabase/supabase-js";
 import { Html5QrcodeScanner, Html5Qrcode } from "html5-qrcode";
 import { createWorker } from "tesseract.js";
+import { gerarRelatorioHtml } from "./relatorioTemplate";
 
 const getSaudacao = () => {
   const hora = new Date().getHours();
@@ -627,12 +628,52 @@ export default function App() {
     const anoFmt = hojeData.getFullYear();
     const horaFmt = String(hojeData.getHours()).padStart(2, '0');
     const minFmt = String(hojeData.getMinutes()).padStart(2, '0');
-    const nomeArquivo = `Relatorio_${diaFmt}-${mesFmt}-${anoFmt}_${horaFmt}${minFmt}`;
+    const nomeArquivo = `Relatorio_Zero1_${diaFmt}-${mesFmt}-${anoFmt}_${horaFmt}${minFmt}`;
     const dataHoraGeracao = `${diaFmt}/${mesFmt}/${anoFmt} às ${horaFmt}:${minFmt}`;
 
     const operadorNome = profile?.nome || "Administrador";
     const operadorCargo = profile?.role === "admin" ? "Administrador" : "Colaborador";
     
+    // Vendas de hoje reais (data atual local)
+    const hojeStrLocal = getLocalDateStr(new Date());
+    const vendasHoje = vendas.filter(v => getLocalDateStr(v.created_at) === hojeStrLocal);
+    const faturamentoHoje = vendasHoje.reduce((acc, v) => acc + (Number(v.preco_vendido) || 0), 0);
+    const qtdHoje = vendasHoje.length;
+
+    // Métricas de estoque atuais (preço de venda)
+    const totalEstoqueItens = bolsas.reduce((acc, b) => acc + (b.quantidade > 0 ? b.quantidade : 0), 0);
+    const valorEstoqueVenda = bolsas.reduce((acc, b) => acc + (b.quantidade * Number(b.preco_venda)), 0);
+    const totalModelosCadastrados = bolsas.length;
+
+    // Produtos com estoque crítico (abaixo ou igual à quantidade mínima)
+    const estoqueCritico = bolsas
+      .filter(b => (b.quantidade || 0) <= (b.quantidade_minima || 2))
+      .sort((a, b) => (a.quantidade || 0) - (b.quantidade || 0));
+    const totalEstoqueCriticoCount = estoqueCritico.length;
+    const estoqueCriticoLimitado = estoqueCritico.slice(0, 10);
+
+    // Produtos mais vendidos do período (Top Sellers)
+    const topSellersMap = {};
+    relatorioVendas.forEach(v => {
+      const bolsaId = v.bolsa_id;
+      if (bolsaId) {
+        if (!topSellersMap[bolsaId]) {
+          const b = bolsas.find(bolsa => bolsa.id === bolsaId);
+          topSellersMap[bolsaId] = {
+            nome: b ? b.nome : v.bolsas?.nome || "Produto Desconhecido",
+            codigo: b ? b.codigo : v.bolsas?.codigo || "—",
+            quantidade: 0,
+            totalFaturado: 0
+          };
+        }
+        topSellersMap[bolsaId].quantidade += 1;
+        topSellersMap[bolsaId].totalFaturado += Number(v.preco_vendido) || 0;
+      }
+    });
+    const topSellers = Object.values(topSellersMap)
+      .sort((a, b) => b.quantidade - a.quantidade)
+      .slice(0, 5);
+
     const formasPagamentoList = [
       { key: "dinheiro", label: "💵 Dinheiro", value: relatorioStats.dinheiro },
       { key: "debito", label: "💳 Débito", value: relatorioStats.debito },
@@ -641,7 +682,7 @@ export default function App() {
       { key: "boleto", label: "📄 Boleto", value: relatorioStats.boleto || 0 },
       { key: "credito_parcelado", label: "💳 Crédito Parcelado", value: relatorioStats.credito_parcelado },
       { key: "credito_a_vista", label: "💳 Crédito à Vista", value: relatorioStats.credito_a_vista },
-      { key: "voucher", label: "🎟 Voucher", value: relatorioStats.voucher },
+      { key: "voucher", label: "🎟️ Voucher", value: relatorioStats.voucher },
       { key: "pix_online", label: "🌐 Pix Online (Site)", value: relatorioStats.pix_online }
     ].sort((a, b) => b.value - a.value);
 
@@ -679,723 +720,35 @@ export default function App() {
 
     const totalDevolvido = trocasDetalhadas.reduce((acc, t) => acc + t.precoDevolvido, 0);
     const totalNovo = trocasDetalhadas.reduce((acc, t) => acc + t.precoNova, 0);
-    const creditosGerados = trocasDetalhadas.reduce((acc, t) => acc + (t.diferenca_valor < 0 ? Math.abs(t.diferenca_valor) : 0), 0);
-    const cobrancasGeradas = trocasDetalhadas.reduce((acc, t) => acc + (t.diferenca_valor > 0 ? t.diferenca_valor : 0), 0);
     const saldoTrocasConsolidado = totalNovo - totalDevolvido;
 
     const totalDescontos = relatorioVendas.reduce((acc, v) => acc + (Number(v.desconto_valor) || 0), 0);
-    const vendasComDesconto = relatorioVendas.filter(v => (Number(v.desconto_valor) || 0) > 0).length;
-    const descontoMedio = vendasComDesconto > 0 ? totalDescontos / vendasComDesconto : 0;
     const faturamentoBruto = relatorioStats.totalFaturado + totalDescontos;
 
-    const diaFimRef = relatorioDataFim || formatLocalDate(new Date());
-    const faturamentoHoje = vendas.filter(v => getLocalDateStr(v.created_at) === diaFimRef)
-      .reduce((acc, v) => acc + (Number(v.preco_vendido) || 0), 0);
-    const dataHojeFmt = new Date(diaFimRef + "T12:00:00").toLocaleDateString("pt-BR");
-
-    const htmlContent = `
-      <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=Hanken+Grotesk:wght@700;800&display=swap');
-        
-        @page {
-          size: A4 portrait;
-          margin: 0 !important;
-        }
-        
-        @media screen {
-          #print-area-container {
-            display: none !important;
-          }
-        }
-        
-        @media print {
-          #root {
-            display: none !important;
-          }
-          body {
-            margin: 0 !important;
-            padding: 0 !important;
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
-            background-color: #FFFFFF !important;
-          }
-          #print-area-container {
-            display: block !important;
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 100%;
-          }
-          .page-break {
-            page-break-before: always !important;
-            break-before: page !important;
-          }
-        }
-
-        #print-area-container {
-          font-family: 'Inter', sans-serif;
-          color: #1F2937;
-          background-color: #FFFFFF;
-          font-size: 9pt;
-          line-height: 1.35;
-        }
-        
-        #print-area-container h1, #print-area-container h2, #print-area-container h3, #print-area-container h4, #print-area-container .font-hanken {
-          font-family: 'Hanken Grotesk', sans-serif;
-        }
-        
-        #print-area-container .page {
-          position: relative;
-          box-sizing: border-box;
-          width: 210mm;
-          height: 297mm;
-          padding: 20mm 20mm 25mm 20mm;
-          page-break-after: always !important;
-          break-after: page !important;
-          overflow: hidden;
-          background-color: #FFFFFF;
-        }
-        
-        #print-area-container .print-header {
-          border-bottom: 1.5pt solid #E91E8C;
-          padding-bottom: 6px;
-          margin-bottom: 14px;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-        }
-        #print-area-container .print-header-left {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-        }
-        #print-area-container .logo-box {
-          width: 36px;
-          height: 36px;
-          background-color: #E91E8C;
-          border-radius: 6px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          color: #FFFFFF;
-          font-weight: 800;
-          font-size: 15pt;
-        }
-        #print-area-container .store-title {
-          font-size: 13pt;
-          font-weight: 800;
-          color: #1F2937;
-          margin: 0;
-          line-height: 1.1;
-        }
-        #print-area-container .store-subtitle {
-          font-size: 8pt;
-          color: #6B7280;
-          margin: 0;
-        }
-        #print-area-container .print-header-right {
-          text-align: right;
-        }
-        #print-area-container .doc-title {
-          font-size: 12pt;
-          font-weight: 800;
-          color: #E91E8C;
-          margin: 0;
-          text-transform: uppercase;
-          letter-spacing: 0.05em;
-        }
-        #print-area-container .doc-date {
-          font-size: 9pt;
-          color: #6B7280;
-          margin: 0;
-        }
-        
-        #print-area-container .print-meta-row {
-          display: flex;
-          justify-content: space-between;
-          font-size: 8.5pt;
-          color: #6B7280;
-          margin-top: -8px;
-          margin-bottom: 15px;
-          font-weight: 500;
-        }
-        
-        #print-area-container .print-footer {
-          position: absolute;
-          bottom: 12mm;
-          left: 20mm;
-          right: 20mm;
-          border-top: 0.5pt solid #E5E7EB;
-          padding-top: 6px;
-          text-align: center;
-          font-size: 7.5pt;
-          color: #9CA3AF;
-        }
-        
-        #print-area-container .section {
-          margin-bottom: 18px;
-        }
-        #print-area-container .section-title {
-          font-size: 11pt;
-          font-weight: 800;
-          color: #1F2937;
-          margin: 0 0 2px 0;
-          border-bottom: 1px solid #E5E7EB;
-          padding-bottom: 2px;
-          text-transform: uppercase;
-          letter-spacing: 0.03em;
-        }
-        #print-area-container .section-subtitle {
-          font-size: 8.5pt;
-          color: #6B7280;
-          margin: 0 0 8px 0;
-        }
-        
-        #print-area-container table {
-          width: 100%;
-          border-collapse: collapse;
-          margin-bottom: 10px;
-        }
-        #print-area-container th {
-          background-color: #F9FAFB;
-          border-bottom: 1.5pt solid #E5E7EB;
-          padding: 5px 6px;
-          font-size: 7.5pt;
-          font-weight: 800;
-          text-transform: uppercase;
-          color: #6B7280;
-          text-align: left;
-          letter-spacing: 0.05em;
-        }
-        #print-area-container td {
-          padding: 5px 6px;
-          border-bottom: 1px solid #E5E7EB;
-          font-size: 9pt;
-          color: #1F2937;
-        }
-        #print-area-container tr.zebra:nth-child(even) {
-          background-color: #F9FAFB;
-        }
-        #print-area-container tr.highlight {
-          background-color: #FEFCE8 !important;
-        }
-        #print-area-container tr.total-row td {
-          border-top: 1.5pt solid #E5E7EB;
-          font-weight: 800;
-          background-color: #FFF0F7 !important;
-        }
-        
-        #print-area-container .text-right { text-align: right; }
-        #print-area-container .text-center { text-align: center; }
-        #print-area-container .font-bold { font-weight: 700; }
-        #print-area-container .text-emerald { color: #16A34A; }
-        #print-area-container .text-rose { color: #DC2626; }
-        #print-area-container .text-muted { color: #9CA3AF; }
-        
-        #print-area-container .cards-grid {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 10px;
-          margin-bottom: 12px;
-        }
-        #print-area-container .cards-grid-4 {
-          display: grid;
-          grid-template-columns: repeat(4, 1fr);
-          gap: 10px;
-          margin-bottom: 12px;
-        }
-        #print-area-container .card {
-          background-color: #FFFFFF;
-          border: 1px solid #E5E7EB;
-          border-radius: 6px;
-          padding: 8px 10px;
-          box-sizing: border-box;
-        }
-        #print-area-container .card-kpi {
-          background-color: #FFF0F7 !important;
-          border: 1.5px solid #E91E8C;
-        }
-        #print-area-container .card-label {
-          font-size: 7.5pt;
-          font-weight: 800;
-          text-transform: uppercase;
-          color: #6B7280;
-          letter-spacing: 0.05em;
-        }
-        #print-area-container .card-value {
-          font-size: 16pt;
-          font-weight: 800;
-          color: #16A34A;
-          margin-top: 2px;
-        }
-        #print-area-container .card-value-neutral {
-          font-size: 16pt;
-          font-weight: 800;
-          color: #1F2937;
-          margin-top: 2px;
-        }
-        #print-area-container .card-desc {
-          font-size: 7.5pt;
-          color: #9CA3AF;
-          margin-top: 2px;
-        }
-        
-        #print-area-container .bar-container {
-          width: 80px;
-          background-color: #E5E7EB;
-          height: 6px;
-          border-radius: 3px;
-          display: inline-block;
-          vertical-align: middle;
-          overflow: hidden;
-          margin-right: 6px;
-        }
-        #print-area-container .bar-fill {
-          height: 100%;
-          background-color: #E91E8C;
-          border-radius: 3px;
-        }
-        
-        #print-area-container .tag {
-          display: inline-block;
-          font-size: 7.5pt;
-          font-weight: 800;
-          text-transform: uppercase;
-          padding: 1px 4px;
-          border-radius: 3px;
-          letter-spacing: 0.03em;
-        }
-        #print-area-container .tag-promo {
-          color: #E91E8C;
-          background-color: #FFF0F7 !important;
-          border: 1px solid rgba(233, 30, 140, 0.2);
-        }
-        #print-area-container .tag-desc {
-          color: #DC2626;
-          background-color: #FEE2E2 !important;
-          border: 1px solid rgba(220, 38, 38, 0.2);
-        }
-        #print-area-container .tag-credito {
-          color: #16A34A;
-          background-color: #DCFCE7 !important;
-          border: 1px solid rgba(22, 163, 74, 0.2);
-        }
-        #print-area-container .tag-cobranca {
-          color: #DC2626;
-          background-color: #FEE2E2 !important;
-          border: 1px solid rgba(220, 38, 38, 0.2);
-        }
-        
-        #print-area-container .empty-box {
-          background-color: #F9FAFB;
-          border: 1px dashed #E5E7EB;
-          border-radius: 6px;
-          padding: 14px;
-          text-align: center;
-          color: #6B7280;
-          font-size: 8.5pt;
-          font-weight: 500;
-        }
-        
-        #print-area-container .signature-block {
-          margin-top: 25px;
-          display: flex;
-          justify-content: space-between;
-          gap: 40px;
-        }
-        #print-area-container .signature-line {
-          flex: 1;
-          border-top: 1px solid #1F2937;
-          text-align: center;
-          padding-top: 4px;
-          font-size: 7.5pt;
-          font-weight: 500;
-          margin-top: 20px;
-        }
-      </style>
-      
-      <!-- ================= PÁGINA 1 ================= -->
-      <div class="page">
-        <div class="print-header">
-          <div class="print-header-left">
-            <div class="logo-box">01</div>
-            <div>
-              <h1 class="store-title">Zero Um Stock Manager</h1>
-              <p class="store-subtitle">Painel de Controle</p>
-            </div>
-          </div>
-          <div class="print-header-right">
-            <h2 class="doc-title">Relatório Diário</h2>
-            <p class="doc-date">${dataFimFmt}</p>
-          </div>
-        </div>
-        
-        <div class="print-meta-row">
-          <span>Período: ${dataInicioFmt} a ${dataFimFmt}</span>
-          <span>Gerado por: ${operadorNome} (${operadorCargo})</span>
-        </div>
-        
-        <div class="section" style="background-color: #FFF0F7; border: 1.5px solid #E91E8C; border-radius: 8px; padding: 12px; margin-bottom: 16px;">
-          <h3 class="font-hanken" style="font-size: 16pt; font-weight: 800; color: #E91E8C; margin: 0 0 2px 0; text-transform: uppercase;">Relatório Consolidado de Vendas</h3>
-          <p style="font-size: 9pt; color: #6B7280; margin: 0 0 10px 0;">Período: ${dataInicioFmt} a ${dataFimFmt}</p>
-          
-          <div class="cards-grid">
-            <div class="card" style="border-left: 4px solid #16A34A; background-color: #FFFFFF;">
-              <span class="card-label">💰 Faturamento Total</span>
-              <div class="card-value">R$ ${relatorioStats.totalFaturado.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</div>
-              <span class="card-desc">Total da receita bruta</span>
-            </div>
-            <div class="card" style="border-left: 4px solid #1F2937; background-color: #FFFFFF;">
-              <span class="card-label">📦 Saídas do Período</span>
-              <div class="card-value-neutral">${relatorioStats.totalSair} unidades</div>
-              <span class="card-desc">Itens que saíram do estoque</span>
-            </div>
-            <div class="card" style="border-left: 4px solid #16A34A; background-color: #FFFFFF;">
-              <span class="card-label">🎯 Ticket Médio</span>
-              <div class="card-value">R$ ${(relatorioStats.totalSair > 0 ? relatorioStats.totalFaturado / relatorioStats.totalSair : 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</div>
-              <span class="card-desc">Valor médio por venda</span>
-            </div>
-          </div>
-        </div>
-        
-        <div class="section">
-          <h3 class="section-title">Distribuição por Forma de Pagamento</h3>
-          <p class="section-subtitle">Estatísticas detalhadas por método de entrada de recursos no período selecionado</p>
-          
-          <table>
-            <thead>
-              <tr>
-                <th>Forma de Pagamento</th>
-                <th class="text-right">VALOR</th>
-                <th class="text-right">%</th>
-                <th>Barra Visual</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${(() => {
-                const filtradas = formasPagamentoList.filter(item => item.value > 0);
-                if (filtradas.length === 0) {
-                  return `
-                    <tr>
-                      <td colspan="4" class="text-center text-muted" style="padding: 15px;">Nenhum faturamento registrado no período selecionado.</td>
-                    </tr>
-                  `;
-                }
-                return filtradas.map(item => {
-                  const pct = relatorioStats.totalFaturado > 0 ? (item.value / relatorioStats.totalFaturado) * 100 : 0;
-                  return `
-                    <tr>
-                      <td class="font-bold">${item.label}</td>
-                      <td class="text-right font-bold text-emerald">R$ ${item.value.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</td>
-                      <td class="text-right font-bold">${pct.toFixed(0)}%</td>
-                      <td>
-                        <div class="bar-container"><div class="bar-fill" style="width: ${pct}%"></div></div>
-                      </td>
-                    </tr>
-                  `;
-                }).join("") + `
-                  <tr class="total-row">
-                    <td>TOTAL</td>
-                    <td class="text-right text-emerald">R$ ${relatorioStats.totalFaturado.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</td>
-                    <td class="text-right">100%</td>
-                    <td></td>
-                  </tr>
-                `;
-              })()}
-            </tbody>
-          </table>
-        </div>
-        
-        <div class="section">
-          <h3 class="section-title">Desempenho de Vendas por Colaborador</h3>
-          <p class="section-subtitle">Ranking de faturamento e quantidade vendida por colaborador no período</p>
-          
-          <table>
-            <thead>
-              <tr>
-                <th class="text-center" style="width: 50px;">Pos.</th>
-                <th>Colaborador</th>
-                <th>Cargo</th>
-                <th class="text-right">Faturamento</th>
-                <th class="text-center" style="width: 100px;">Qtd. Vendida</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${rankingVendedoresPeriodo.map((v, index) => {
-                const isFirst = index === 0 && v.total > 0;
-                const cargo = v.role === "admin" ? "Administrador" : "Colaborador";
-                return `
-                  <tr class="${isFirst ? 'highlight font-bold' : ''}">
-                    <td class="text-center">${isFirst ? '🥇 1º' : `${index + 1}º`}</td>
-                    <td>${isFirst ? '⭐ ' : ''}${v.nome}</td>
-                    <td>${cargo}</td>
-                    <td class="text-right text-emerald font-bold">R$ ${v.total.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</td>
-                    <td class="text-center">${v.quantidade} un</td>
-                  </tr>
-                `;
-              }).join("")}
-            </tbody>
-          </table>
-        </div>
-        
-        <div class="print-footer">
-          Zero Um Stock Manager © 2026 &nbsp;|&nbsp; Página 1 de 3 &nbsp;|&nbsp; Gerado em ${dataHoraGeracao} &nbsp;|&nbsp; Confidencial
-        </div>
-      </div>
-      
-      <!-- ================= PÁGINA 2 ================= -->
-      <div class="page page-break">
-        <div class="print-header">
-          <div class="print-header-left">
-            <div class="logo-box">01</div>
-            <div>
-              <h1 class="store-title">Zero Um Stock Manager</h1>
-              <p class="store-subtitle">Painel de Controle</p>
-            </div>
-          </div>
-          <div class="print-header-right">
-            <h2 class="doc-title">Relatório Diário</h2>
-            <p class="doc-date">${dataFimFmt}</p>
-          </div>
-        </div>
-        
-        <div class="print-meta-row">
-          <span>Período: ${dataInicioFmt} a ${dataFimFmt}</span>
-          <span>Gerado por: ${operadorNome} (${operadorCargo})</span>
-        </div>
-        
-        <div class="section">
-          <h3 class="section-title">Resumo de Movimentações</h3>
-          <p class="section-subtitle">Visão geral de todas as movimentações: estoque, vendas e trocas</p>
-          
-          <!-- Estoque Consolidado Atual -->
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
-            <div class="card" style="background-color: #FFF5F7 !important; border: 1.5px solid #D12D6C;">
-              <span class="card-label" style="color: #D12D6C;">👜 Estoque Total Consolidado (Hoje)</span>
-              <div class="card-value" style="color: #29141B; font-size: 16pt;">${bolsas.reduce((acc, b) => acc + (b.quantidade > 0 ? b.quantidade : 0), 0).toLocaleString("pt-BR")} un</div>
-              <span class="card-desc" style="color: #29141B/60;">${bolsas.length} modelo(s) cadastrado(s)</span>
-            </div>
-            <div class="card" style="background-color: #FCFAF9 !important; border: 1px solid #E5E7EB;">
-              <span class="card-label" style="color: #475569;">💰 Valor Estimado do Estoque (Preço Venda)</span>
-              <div class="card-value" style="color: #059669; font-size: 16pt;">R$ ${bolsas.reduce((acc, b) => acc + (b.quantidade * Number(b.preco_venda)), 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</div>
-              <span class="card-desc" style="color: #475569;">Valor de venda consolidado</span>
-            </div>
-          </div>
-          
-          <div class="cards-grid-4">
-            <div class="card" style="background-color: #DCFCE7 !important; border: 1px solid #BBF7D0;">
-              <span class="card-label">📥 Entradas</span>
-              <div class="card-value" style="color: #16A34A;">${totalEntradasPeriodo} un</div>
-              <span class="card-desc" style="color: #16A34A;">${relatorioEntradas.length} registro(s)</span>
-            </div>
-            <div class="card" style="background-color: #FEE2E2 !important; border: 1px solid #FECACA;">
-              <span class="card-label">📤 Saídas</span>
-              <div class="card-value" style="color: #DC2626;">${relatorioStats.totalSair} un</div>
-              <span class="card-desc" style="color: #DC2626;">unidades vendidas</span>
-            </div>
-            <div class="card" style="background-color: #FEF3C7 !important; border: 1px solid #FDE68A;">
-              <span class="card-label">🔄 Trocas</span>
-              <div class="card-value-neutral" style="color: #D97706; font-size: 16pt;">${relatorioTrocas.length}</div>
-              <span class="card-desc" style="color: #D97706;">trocas efetuadas</span>
-            </div>
-            <div class="card" style="background-color: #DBEAFE !important; border: 1px solid #BFDBFE;">
-              <span class="card-label">🏛️ Saldo Estoque</span>
-              <div class="card-value-neutral" style="color: #1D4ED8; font-size: 16pt;">
-                ${(totalEntradasPeriodo - relatorioStats.totalSair) >= 0 ? "+" : ""}${totalEntradasPeriodo - relatorioStats.totalSair}
-              </div>
-              <span class="card-desc" style="color: #1D4ED8;">entradas - saídas</span>
-            </div>
-          </div>
-        </div>
-        
-        <div class="section">
-          <h3 class="section-title">Resumo de Vendas e Descontos</h3>
-          <p class="section-subtitle">Indicadores de faturamento e descontos aplicados no período</p>
-          
-          <table style="max-width: 600px; margin: 0 auto; border: 1px solid #E5E7EB; border-radius: 8px;">
-            <tbody>
-              <tr>
-                <td style="color: #6B7280; font-weight: 500;">Total de vendas realizadas:</td>
-                <td class="text-right font-bold">${relatorioStats.totalSair} vendas</td>
-              </tr>
-              <tr>
-                <td style="color: #6B7280; font-weight: 500;">Faturamento bruto (sem descontos):</td>
-                <td class="text-right font-bold">R$ ${faturamentoBruto.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</td>
-              </tr>
-              <tr>
-                <td style="color: #6B7280; font-weight: 500;">Total de descontos aplicados:</td>
-                <td class="text-right text-rose font-bold">
-                  ${totalDescontos > 0 ? `- R$ ${totalDescontos.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : `<span style="color: #9CA3AF;">—</span>`}
-                </td>
-              </tr>
-              <tr>
-                <td style="color: #6B7280; font-weight: 500;">Vendas com desconto:</td>
-                <td class="text-right font-bold">
-                  ${vendasComDesconto > 0 ? `${vendasComDesconto} vendas` : `<span style="color: #9CA3AF;">—</span>`}
-                </td>
-              </tr>
-              <tr>
-                <td style="color: #6B7280; font-weight: 500;">Desconto médio por venda:</td>
-                <td class="text-right text-rose font-bold">
-                  ${descontoMedio > 0 ? `- R$ ${descontoMedio.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : `<span style="color: #9CA3AF;">—</span>`}
-                </td>
-              </tr>
-              <tr style="background-color: #FFF0F7 !important; border-top: 1.5pt solid #E91E8C;">
-                <td style="color: #E91E8C; font-weight: bold;">Faturamento líquido:</td>
-                <td class="text-right text-emerald font-bold" style="font-size: 11pt;">R$ ${relatorioStats.totalFaturado.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        
-        <div class="section">
-          <h3 class="section-title">Resumo Financeiro de Trocas</h3>
-          <p class="section-subtitle">Consolidado das movimentações de trocas de produtos no período selecionado</p>
-          
-          <div class="cards-grid" style="margin-top: 10px; margin-bottom: 0;">
-            <div class="card" style="border-left: 4px solid #D97706; background-color: #FFFFFF;">
-              <span class="card-label">🔄 Qtd. de Trocas</span>
-              <div class="card-value-neutral" style="color: #D97706; font-size: 14pt;">${relatorioTrocas.length} trocas</div>
-              <span class="card-desc">Operações realizadas</span>
-            </div>
-            <div class="card" style="border-left: 4px solid #DC2626; background-color: #FFFFFF;">
-              <span class="card-label">📉 Valor Devolvido</span>
-              <div class="card-value" style="color: #DC2626; font-size: 14pt;">R$ ${totalDevolvido.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</div>
-              <span class="card-desc">Créditos gerados ao cliente</span>
-            </div>
-            <div class="card" style="border-left: 4px solid #16A34A; background-color: #FFFFFF;">
-              <span class="card-label">📈 Novas Peças Levadas</span>
-              <div class="card-value" style="color: #16A34A; font-size: 14pt;">R$ ${totalNovo.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</div>
-              <span class="card-desc">Faturamento de novos produtos</span>
-            </div>
-          </div>
-          
-          <div class="card" style="margin-top: 10px; border-left: 4px solid ${saldoTrocasConsolidado >= 0 ? '#16A34A' : '#DC2626'}; background-color: ${saldoTrocasConsolidado >= 0 ? '#F0FDF4' : '#FEF2F2'}; padding: 10px 14px;">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-              <div>
-                <span class="card-label" style="color: ${saldoTrocasConsolidado >= 0 ? '#16A34A' : '#DC2626'}; font-weight: 800;">⚖️ Saldo Financeiro das Trocas</span>
-                <span class="card-desc" style="display: block; margin-top: 1px; color: ${saldoTrocasConsolidado >= 0 ? '#15803D' : '#B91C1C'};">
-                  ${saldoTrocasConsolidado >= 0 
-                    ? 'A loja teve saldo positivo (diferença cobrada do cliente).' 
-                    : 'A loja gerou saldo de crédito futuro para o cliente.'}
-                </span>
-              </div>
-              <div class="card-value" style="color: ${saldoTrocasConsolidado >= 0 ? '#16A34A' : '#DC2626'}; font-size: 15pt; margin: 0; font-weight: 800;">
-                ${saldoTrocasConsolidado >= 0 ? '+' : ''} R$ ${saldoTrocasConsolidado.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-              </div>
-            </div>
-          </div>
-        </div>
-        
-        <div class="print-footer">
-          Zero Um Stock Manager © 2026 &nbsp;|&nbsp; Página 2 de 3 &nbsp;|&nbsp; Gerado em ${dataHoraGeracao} &nbsp;|&nbsp; Confidencial
-        </div>
-      </div>
-      
-      <!-- ================= PÁGINA 3 ================= -->
-      <div class="page page-break">
-        <div class="print-header">
-          <div class="print-header-left">
-            <div class="logo-box">01</div>
-            <div>
-              <h1 class="store-title">Zero Um Stock Manager</h1>
-              <p class="store-subtitle">Painel de Controle</p>
-            </div>
-          </div>
-          <div class="print-header-right">
-            <h2 class="doc-title">Relatório Diário</h2>
-            <p class="doc-date">${dataFimFmt}</p>
-          </div>
-        </div>
-        
-        <div class="print-meta-row">
-          <span>Período: ${dataInicioFmt} a ${dataFimFmt}</span>
-          <span>Gerado por: ${operadorNome} (${operadorCargo})</span>
-        </div>
-        
-        <div class="section">
-          <h3 class="section-title">Faturamento — ${dadosMensais.nomeMesAtual.charAt(0).toUpperCase() + dadosMensais.nomeMesAtual.slice(1)} ${dadosMensais.anoAtual}</h3>
-          <p class="section-subtitle">Acumulado do mês até ${dataFimFmt}</p>
-          
-          <div class="cards-grid-4" style="margin-top: 10px;">
-            <div class="card" style="border-left: 4px solid #E91E8C; background-color: #FFFFFF;">
-              <span class="card-label">📅 Total do Dia</span>
-              <div class="card-value" style="font-size: 15pt; margin-top: 2px; font-weight: 800; color: #16A34A;">R$ ${faturamentoHoje.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</div>
-              <span class="card-desc">Vendas em ${dataHojeFmt}</span>
-            </div>
-            <div class="card" style="border-left: 4px solid #16A34A; background-color: #FFFFFF;">
-              <span class="card-label">💰 Total do Mês</span>
-              <div class="card-value" style="font-size: 15pt; margin-top: 2px; font-weight: 800; color: #16A34A;">R$ ${dadosMensais.totalMes.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</div>
-              <span class="card-desc">Acumulado mensal</span>
-            </div>
-            <div class="card" style="border-left: 4px solid #1F2937; background-color: #FFFFFF;">
-              <span class="card-label">📆 Dias com Venda</span>
-              <div class="card-value-neutral" style="font-size: 15pt; margin-top: 2px; font-weight: 800;">${dadosMensais.diasComVenda} dias</div>
-              <span class="card-desc">dias ativos no mês</span>
-            </div>
-            <div class="card" style="border-left: 4px solid #1F2937; background-color: #FFFFFF;">
-              <span class="card-label">📦 Itens Vendidos</span>
-              <div class="card-value-neutral" style="font-size: 15pt; margin-top: 2px; font-weight: 800;">${dadosMensais.itensVendidosMes} un</div>
-              <span class="card-desc">saídas no mês</span>
-            </div>
-          </div>
- 
-          ${(() => {
-            let anteriorHtml = "";
-            if (dadosMensais.totalMesAnterior > 0) {
-              const varSinal = dadosMensais.variacaoPct >= 0 ? "▲ +" : "▼ ";
-              const varColor = dadosMensais.variacaoPct >= 0 ? "#16A34A" : "#DC2626";
-              
-              anteriorHtml = `
-                <div style="display: flex; justify-content: space-between; border-top: 1px solid #E5E7EB; padding-top: 8px; margin-top: 8px;">
-                  <span style="color: #6B7280;">Mês Anterior (${dadosMensais.nomeMesAnterior.charAt(0).toUpperCase() + dadosMensais.nomeMesAnterior.slice(1)} ${dadosMensais.anoAtual}):</span>
-                  <strong>
-                    R$ ${dadosMensais.totalMesAnterior.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-                    &nbsp;&nbsp;
-                    <span style="color: ${varColor}; font-weight: bold;">${varSinal}${dadosMensais.variacaoPct.toFixed(0)}%</span>
-                  </strong>
-                </div>
-              `;
-            }
-            
-            return `
-              <div style="margin-top: 15px; font-family: 'Inter', sans-serif; font-size: 9.5pt; line-height: 1.8; border: 1px solid #E5E7EB; border-radius: 8px; padding: 10px 14px; background-color: #F9FAFB; max-width: 600px; margin-left: auto; margin-right: auto;">
-                <div style="display: flex; justify-content: space-between;">
-                  <span style="color: #6B7280;">Faturamento do Mês Atual:</span>
-                  <strong style="color: #1F2937;">R$ ${dadosMensais.totalMes.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong>
-                </div>
-                ${anteriorHtml}
-              </div>
-            `;
-          })()}
-        </div>
-        
-        <div class="section" style="margin-top: 35px; border-top: 1px solid #E5E7EB; padding-top: 20px;">
-          <p style="font-size: 8.5pt; color: #6B7280; margin: 0; text-align: center;">
-            Relatório gerado automaticamente pelo Zero Um Stock Manager em ${dataHoraGeracao} — ${operadorNome} (${operadorCargo})
-          </p>
-          
-          <div class="signature-block">
-            <div class="signature-line">
-              Assinatura do Responsável
-            </div>
-            <div class="signature-line">
-              Assinatura do Conferente
-            </div>
-          </div>
-          
-          <p class="text-center" style="font-size: 7.5pt; color: #9CA3AF; margin-top: 25px; font-style: italic; text-align: center;">
-            Zero Um Stock Manager © 2026 — Documento de uso interno e confidencial.
-          </p>
-        </div>
-        
-        <div class="print-footer">
-          Zero Um Stock Manager © 2026 &nbsp;|&nbsp; Página 3 de 3 &nbsp;|&nbsp; Gerado em ${dataHoraGeracao} &nbsp;|&nbsp; Confidencial
-        </div>
-      </div>
-    </body>
-    </html>
-    `;
+    const htmlContent = gerarRelatorioHtml({
+      nomeArquivo,
+      dataHoraGeracao,
+      dataInicioFmt,
+      dataFimFmt,
+      operadorNome,
+      operadorCargo,
+      faturamentoHoje,
+      qtdHoje,
+      totalEstoqueItens,
+      valorEstoqueVenda,
+      totalModelosCadastrados,
+      estoqueCriticoLimitado,
+      totalEstoqueCriticoCount,
+      topSellers,
+      formasPagamentoList,
+      relatorioStats,
+      rankingVendedoresPeriodo,
+      totalDevolvido,
+      totalNovo,
+      saldoTrocasConsolidado,
+      totalDescontos,
+      faturamentoBruto
+    });
 
     // Criar ou obter o container para a impressão
     let printContainer = document.getElementById("print-area-container");
