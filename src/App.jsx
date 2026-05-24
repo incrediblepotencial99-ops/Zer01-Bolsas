@@ -4688,6 +4688,52 @@ export default function App() {
                           </select>
                         </div>
 
+                        {/* Itens em posse do cliente selecionado */}
+                        {formTroca.cliente_id && (() => {
+                          const clientActiveSales = vendas.filter(v => v.cliente_id === formTroca.cliente_id && !v.devolvida);
+                          if (clientActiveSales.length === 0) return null;
+                          return (
+                            <div className="flex flex-col gap-1.5 mt-1 bg-[#FCFAF9] border border-[#FCEEF3] rounded-2xl p-3 shadow-xs">
+                              <span className="text-[9px] font-extrabold uppercase text-[#29141B]/60 tracking-wider flex items-center gap-1.5 select-none">
+                                <span className="material-symbols-outlined text-xs text-[#D12D6C]">inventory_2</span>
+                                Itens comprados (Em Posse) ({clientActiveSales.length})
+                              </span>
+                              <p className="text-[9px] text-[#29141B]/55 select-none -mt-1 mb-0.5">Clique em um item para selecioná-lo para a troca:</p>
+                              <div className="flex flex-col gap-1.5 max-h-[140px] overflow-y-auto pr-1">
+                                {clientActiveSales.map(v => (
+                                  <div 
+                                    key={v.id} 
+                                    onClick={() => {
+                                      if (v.bolsas?.codigo) {
+                                        setCodigoDevolvido(v.bolsas.codigo);
+                                        setFormTroca(prev => ({
+                                          ...prev,
+                                          venda_id: v.id,
+                                          bolsa_devolvida_id: v.bolsa_id
+                                        }));
+                                        setFeedbackDevolvido({
+                                          success: true,
+                                          message: `Selecionado: "${v.bolsas?.nome}" • Código: ${v.bolsas?.codigo} • Pago original: R$ ${Number(v.preco_vendido).toFixed(2)}`
+                                        });
+                                      }
+                                    }}
+                                    className="bg-white border border-[#EACAD6]/40 hover:border-[#D12D6C]/50 hover:bg-[#FFEBF2]/20 rounded-xl p-2.5 flex items-center justify-between cursor-pointer transition-all duration-200 active:scale-98 group shadow-xs"
+                                    title="Clique para selecionar este produto para devolução"
+                                  >
+                                    <div className="flex flex-col min-w-0 flex-1">
+                                      <span className="text-xs font-bold text-[#29141B] truncate group-hover:text-[#D12D6C] transition-colors">{v.bolsas?.nome}</span>
+                                      <span className="text-[9px] text-[#29141B]/60 font-mono mt-0.5">Cód: {v.bolsas?.codigo || "-"}</span>
+                                    </div>
+                                    <span className="text-xs font-extrabold text-emerald-600 bg-emerald-50 border border-emerald-100/50 px-2 py-0.5 rounded shrink-0">
+                                      R$ {Number(v.preco_vendido).toFixed(2)}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })()}
+
                         {/* Código de Etiqueta do Produto Devolvido */}
                         <div className="flex flex-col gap-1">
                           <label className="text-[10px] font-bold text-[#29141B]/85 uppercase tracking-wider">Código da Etiqueta Devolvida</label>
