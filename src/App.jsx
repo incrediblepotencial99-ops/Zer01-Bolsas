@@ -1083,6 +1083,18 @@ export default function App() {
       });
 
       // 2. Perform atomic sale transaction via RPC in Supabase
+      // Safe UUID generation (compatible with non-secure HTTP contexts on mobile)
+      const generateUUID = () => {
+        if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+          return crypto.randomUUID();
+        }
+        return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function(c) {
+          const r = (Math.random() * 16) | 0;
+          const v = c === "x" ? r : (r & 0x3) | 0x8;
+          return v.toString(16);
+        });
+      };
+      const vendaGrupoId = generateUUID();
       const { error: sellErr } = await supabase
         .rpc("registrar_venda_transacao", {
           p_cliente_id: formVenda.cliente_id,
@@ -1090,7 +1102,8 @@ export default function App() {
           p_forma_pagamento: formVenda.forma_pagamento || "dinheiro",
           p_observacao: formVenda.observacao || null,
           p_itens: rowsToInsert,
-          p_loja_id: activeStore?.id
+          p_loja_id: activeStore?.id,
+          p_venda_grupo_id: vendaGrupoId
         });
 
       if (sellErr) throw sellErr;
@@ -1375,6 +1388,93 @@ export default function App() {
     if (!activeStore) return vendas;
     return vendas.filter(v => v.loja_id === activeStore.id);
   }, [vendas, activeStore]);
+
+  const vendasAgrupadasPorLoja = useMemo(() => {
+    const grupos = [];
+
+    // Safe date parser to avoid NaN on iOS/Safari browsers
+    const parseSafeDate = (dateStr) => {
+      if (!dateStr) return 0;
+      if (typeof dateStr === "number") return dateStr;
+      let formatted = dateStr;
+      if (typeof dateStr === "string") {
+        formatted = dateStr.replace(" ", "T");
+      }
+      const d = new Date(formatted);
+      return isNaN(d.getTime()) ? 0 : d.getTime();
+    };
+
+    vendasPorLoja.forEach(v => {
+      const tV = parseSafeDate(v.created_at);
+
+      // Buscar um grupo compatível (mesmo venda_grupo_id exato ou fallback legado por timestamp)
+      const grupoCompativel = grupos.find(g => {
+        if (v.venda_grupo_id && g.venda_grupo_id) {
+          return g.venda_grupo_id === v.venda_grupo_id;
+        }
+        const tG = parseSafeDate(g.created_at);
+        return g.cliente_id === v.cliente_id &&
+          g.funcionario_id === v.funcionario_id &&
+          g.forma_pagamento === v.forma_pagamento &&
+          tV > 0 && tG > 0 && Math.abs(tG - tV) < 5000;
+      });
+
+      if (grupoCompativel) {
+        grupoCompativel.ids.push(v.id);
+        grupoCompativel.preco_vendido += Number(v.preco_vendido) || 0;
+        grupoCompativel.desconto_valor += Number(v.desconto_valor) || 0;
+        if (v.tinha_desconto) grupoCompativel.tinha_desconto = true;
+        if (v.devolvida) grupoCompativel.devolvida = true;
+
+        const itemExistente = grupoCompativel.itens.find(i => i.bolsa_id === v.bolsa_id);
+        if (itemExistente) {
+          itemExistente.qty += 1;
+          itemExistente.preco_vendido += Number(v.preco_vendido) || 0;
+          itemExistente.desconto_valor += Number(v.desconto_valor) || 0;
+        } else {
+          grupoCompativel.itens.push({
+            bolsa_id: v.bolsa_id,
+            nome: v.bolsas?.nome || "Produto Excluído",
+            codigo: v.bolsas?.codigo || "-",
+            qty: 1,
+            preco_vendido: Number(v.preco_vendido) || 0,
+            desconto_valor: Number(v.desconto_valor) || 0
+          });
+        }
+      } else {
+        grupos.push({
+          id: v.id,
+          ids: [v.id],
+          venda_grupo_id: v.venda_grupo_id,
+          cliente_id: v.cliente_id,
+          funcionario_id: v.funcionario_id,
+          preco_vendido: Number(v.preco_vendido) || 0,
+          desconto_valor: Number(v.desconto_valor) || 0,
+          tinha_desconto: v.tinha_desconto,
+          data: v.data,
+          observacao: v.observacao,
+          created_at: v.created_at,
+          forma_pagamento: v.forma_pagamento,
+          devolvida: v.devolvida,
+          loja_id: v.loja_id,
+          clientes: v.clientes,
+          profiles: v.profiles,
+          bolsa_id: v.bolsa_id,
+          bolsas: v.bolsas,
+          itens: [{
+            bolsa_id: v.bolsa_id,
+            nome: v.bolsas?.nome || "Produto Excluído",
+            codigo: v.bolsas?.codigo || "-",
+            qty: 1,
+            preco_vendido: Number(v.preco_vendido) || 0,
+            desconto_valor: Number(v.desconto_valor) || 0
+          }]
+        });
+      }
+    });
+
+    return grupos.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  }, [vendasPorLoja]);
 
   const trocasPorLoja = useMemo(() => {
     if (!activeStore) return trocas;
@@ -2168,91 +2268,21 @@ export default function App() {
           
           {/* Seletor de Loja - Popover Inline (Desktop) */}
           {lojas.length > 0 && activeStore && (
-            <div className="w-full mt-3 px-2 relative">
+            <div className="w-full mt-3 px-2">
               <label className="block text-[9px] font-extrabold text-[#D12D6C] uppercase tracking-wider mb-1.5 text-center select-none">
                 Loja Ativa
               </label>
               <button
                 type="button"
-                onClick={() => setIsLojaDrawerOpen(prev => !prev)}
-                className={`w-full flex items-center justify-between text-[#29141B] border rounded-xl px-3 py-2 text-xs font-bold shadow-sm transition-all cursor-pointer group ${
-                  isLojaDrawerOpen
-                    ? 'bg-[#1A1A2E] text-white border-[#C9A84C]/60'
-                    : 'bg-white hover:bg-rose-50 border-[#EACAD6]'
-                }`}
+                onClick={() => setIsLojaDrawerOpen(true)}
+                className="w-full flex items-center justify-between text-[#29141B] bg-white border border-[#EACAD6] rounded-xl px-3 py-2 text-xs font-bold shadow-sm hover:bg-rose-50 transition-all cursor-pointer group hover:scale-[1.02] active:scale-[0.98]"
               >
                 <div className="flex items-center gap-2">
-                  <span className={`material-symbols-outlined text-[16px] ${ isLojaDrawerOpen ? 'text-[#C9A84C]' : 'text-[#D12D6C]'}`}>store</span>
-                  <span className={`truncate ${isLojaDrawerOpen ? 'text-white' : ''}`}>{activeStore.nome}</span>
+                  <span className="material-symbols-outlined text-[16px] text-[#D12D6C] group-hover:animate-pulse">store</span>
+                  <span className="truncate">{activeStore.nome}</span>
                 </div>
-                <span className={`material-symbols-outlined text-[14px] transition-transform duration-300 ${
-                  isLojaDrawerOpen ? 'rotate-180 text-[#C9A84C]' : 'text-[#29141B]/40'
-                }`}>expand_more</span>
+                <span className="material-symbols-outlined text-[14px] text-[#29141B]/40 group-hover:translate-x-0.5 transition-transform">chevron_right</span>
               </button>
-
-              {/* Popover dropdown - Desktop */}
-              <AnimatePresence>
-                {isLojaDrawerOpen && (
-                  <>
-                    <div className="fixed inset-0 z-[55]" onClick={() => setIsLojaDrawerOpen(false)} />
-                    <motion.div
-                      initial={{ opacity: 0, y: -8, scale: 0.97 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: -8, scale: 0.97 }}
-                      transition={{ duration: 0.18, ease: 'easeOut' }}
-                      className="absolute top-full left-0 right-0 mt-2 z-[60] bg-[#1A1A2E] border border-[#C9A84C]/30 rounded-2xl shadow-[0_12px_40px_rgba(0,0,0,0.5)] overflow-hidden"
-                    >
-                      <div className="px-3 pt-3 pb-1">
-                        <span className="text-[8px] uppercase tracking-widest font-extrabold text-[#C9A84C]/60">Trocar Unidade</span>
-                      </div>
-                      <div className="flex flex-col gap-1 p-2">
-                        {(profile?.role === 'admin'
-                          ? lojas
-                          : lojas.filter(l => funcionarioLojas.some(fl => fl.funcionario_id === profile.id && fl.loja_id === l.id))
-                        ).map(l => {
-                          const isSelected = activeStore?.id === l.id;
-                          const canChange = profile?.role === 'admin' || funcionarioLojas.filter(fl => fl.funcionario_id === profile.id).length > 1;
-                          return (
-                            <button
-                              key={l.id}
-                              onClick={() => {
-                                if (!canChange) return;
-                                handleSetActiveStore(l);
-                                setIsLojaDrawerOpen(false);
-                                triggerToast(`Loja alterada para: ${l.nome}`);
-                              }}
-                              disabled={!canChange}
-                              className={`w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 cursor-pointer ${
-                                isSelected
-                                  ? 'bg-[#C9A84C]/10 border border-[#C9A84C]/40'
-                                  : 'hover:bg-white/5 border border-transparent'
-                              } ${!canChange && 'opacity-60 cursor-not-allowed'}`}
-                            >
-                              <span className={`material-symbols-outlined text-[18px] ${ isSelected ? 'text-[#C9A84C]' : 'text-white/40'}`}>store</span>
-                              <div className="flex flex-col flex-1 min-w-0">
-                                <span className={`text-xs font-bold truncate ${ isSelected ? 'text-[#C9A84C]' : 'text-white'}`}>{l.nome}</span>
-                                <span className="text-[9px] text-white/35">{l.nome === 'Loja Matriz' ? 'Unidade Central' : 'Filial de Operações'}</span>
-                              </div>
-                              {isSelected && (
-                                <div className="flex items-center gap-1 shrink-0">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-[#C9A84C] animate-ping" />
-                                  <span className="text-[8px] font-black text-[#C9A84C] uppercase tracking-wider">Ativa</span>
-                                </div>
-                              )}
-                            </button>
-                          );
-                        })}
-                      </div>
-                      <div className="px-4 py-2.5 border-t border-[#C9A84C]/10 flex items-center justify-between">
-                        <span className="text-[8px] text-white/30 font-semibold">{profile?.nome}</span>
-                        <span className={`text-[8px] font-black uppercase tracking-wider ${ profile?.role === 'admin' ? 'text-[#C9A84C]' : 'text-white/40'}`}>
-                          {profile?.role === 'admin' ? 'Admin' : 'Colaborador'}
-                        </span>
-                      </div>
-                    </motion.div>
-                  </>
-                )}
-              </AnimatePresence>
             </div>
           )}
         </div>
@@ -2295,82 +2325,20 @@ export default function App() {
 
         {/* Sub-header de Loja Ativa (Mobile Only - Popover Inline) */}
         {lojas.length > 0 && activeStore && (
-          <div className={`md:hidden w-full bg-white border-b border-[#FCEEF3] px-container-padding py-2.5 flex justify-between items-center print:hidden shadow-xs relative ${isLojaDrawerOpen ? 'z-[70]' : 'z-30'}`}>
+          <div className="md:hidden w-full bg-white border-b border-[#FCEEF3] px-container-padding py-2.5 flex justify-between items-center print:hidden shadow-xs relative z-30">
             <span className="text-[10px] font-extrabold text-[#29141B]/60 uppercase tracking-wider">
               Loja:
             </span>
             <div className="relative">
               <button
                 type="button"
-                onClick={() => setIsLojaDrawerOpen(prev => !prev)}
-                className={`flex items-center gap-1.5 border rounded-xl px-3 py-1 text-xs font-bold transition-all cursor-pointer ${
-                  isLojaDrawerOpen
-                    ? 'bg-[#1A1A2E] text-white border-[#C9A84C]/60'
-                    : 'bg-[#FCFAF9] active:bg-[#FFEBF2] text-[#29141B] border-[#EACAD6]'
-                }`}
+                onClick={() => setIsLojaDrawerOpen(true)}
+                className="flex items-center gap-1.5 bg-[#FCFAF9] active:bg-[#FFEBF2] text-[#29141B] border border-[#EACAD6] rounded-xl px-3 py-1 text-xs font-bold transition-all cursor-pointer hover:scale-[1.02]"
               >
-                <span className={`material-symbols-outlined text-[14px] ${ isLojaDrawerOpen ? 'text-[#C9A84C]' : 'text-[#D12D6C]'}`}>store</span>
+                <span className="material-symbols-outlined text-[14px] text-[#D12D6C]">store</span>
                 <span className="max-w-[120px] truncate">{activeStore.nome}</span>
-                <span className={`material-symbols-outlined text-[14px] transition-transform duration-300 ${ isLojaDrawerOpen ? 'rotate-180 text-[#C9A84C]' : 'text-[#29141B]/50'}`}>expand_more</span>
+                <span className="material-symbols-outlined text-[14px] text-[#29141B]/50">chevron_right</span>
               </button>
-
-              {/* Popover dropdown - Mobile */}
-              <AnimatePresence>
-                {isLojaDrawerOpen && (
-                  <>
-                    <div className="fixed inset-0 z-[55]" onClick={() => setIsLojaDrawerOpen(false)} />
-                    <motion.div
-                      initial={{ opacity: 0, y: -8, scale: 0.97 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: -8, scale: 0.97 }}
-                      transition={{ duration: 0.18, ease: 'easeOut' }}
-                      className="absolute top-full right-0 mt-2 w-64 z-[60] bg-[#1A1A2E] border border-[#C9A84C]/30 rounded-2xl shadow-[0_12px_40px_rgba(0,0,0,0.5)] overflow-hidden"
-                    >
-                      <div className="px-3 pt-3 pb-1">
-                        <span className="text-[8px] uppercase tracking-widest font-extrabold text-[#C9A84C]/60">Trocar Unidade</span>
-                      </div>
-                      <div className="flex flex-col gap-1 p-2">
-                        {(profile?.role === 'admin'
-                          ? lojas
-                          : lojas.filter(l => funcionarioLojas.some(fl => fl.funcionario_id === profile.id && fl.loja_id === l.id))
-                        ).map(l => {
-                          const isSelected = activeStore?.id === l.id;
-                          const canChange = profile?.role === 'admin' || funcionarioLojas.filter(fl => fl.funcionario_id === profile.id).length > 1;
-                          return (
-                            <button
-                              key={l.id}
-                              onClick={() => {
-                                if (!canChange) return;
-                                handleSetActiveStore(l);
-                                setIsLojaDrawerOpen(false);
-                                triggerToast(`Loja alterada para: ${l.nome}`);
-                              }}
-                              disabled={!canChange}
-                              className={`w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 cursor-pointer ${
-                                isSelected
-                                  ? 'bg-[#C9A84C]/10 border border-[#C9A84C]/40'
-                                  : 'hover:bg-white/5 border border-transparent'
-                              } ${!canChange && 'opacity-60 cursor-not-allowed'}`}
-                            >
-                              <span className={`material-symbols-outlined text-[18px] ${ isSelected ? 'text-[#C9A84C]' : 'text-white/40'}`}>store</span>
-                              <div className="flex flex-col flex-1 min-w-0">
-                                <span className={`text-xs font-bold truncate ${ isSelected ? 'text-[#C9A84C]' : 'text-white'}`}>{l.nome}</span>
-                                <span className="text-[9px] text-white/35">{l.nome === 'Loja Matriz' ? 'Unidade Central' : 'Filial'}</span>
-                              </div>
-                              {isSelected && (
-                                <div className="flex items-center gap-1 shrink-0">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-[#C9A84C] animate-ping" />
-                                  <span className="text-[8px] font-black text-[#C9A84C] uppercase">Ativa</span>
-                                </div>
-                              )}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </motion.div>
-                  </>
-                )}
-              </AnimatePresence>
             </div>
           </div>
         )}
@@ -4581,29 +4549,35 @@ export default function App() {
                             </tr>
                           </thead>
                           <tbody>
-                            {vendasPorLoja.map(v => (
+                            {vendasAgrupadasPorLoja.map(v => (
                               <tr key={v.id} className="border-b border-[#FCEEF3] hover:bg-[#FFEBF2]/40 transition-colors">
                                 <td className="p-3">
-                                  <div className="flex items-center gap-2">
-                                    <div>
-                                      <span className="block font-bold text-[#29141B]">{v.bolsas?.nome}</span>
-                                      <span className="block text-[10px] text-[#29141B]/60">Cód: {v.bolsas?.codigo || "N/A"}</span>
-                                    </div>
-                                    {v.observacao && v.observacao.includes("[Trocada/Devolvida") && (
-                                      <span 
-                                        className="text-[8px] bg-rose-50 border border-rose-200 text-rose-600 font-extrabold uppercase px-1.5 py-0.5 rounded shrink-0 cursor-pointer hover:bg-rose-100 hover:border-rose-300 transition-all shadow-sm active:scale-95 flex items-center gap-0.5" 
-                                        title="Clique para rastrear esta troca no histórico"
-                                        onClick={() => handleRastrearTroca(v.bolsa_id, v.cliente_id)}
-                                      >
-                                        <span className="material-symbols-outlined text-[10px]">sync_alt</span>
-                                        Devolvida
-                                      </span>
-                                    )}
-                                    {v.forma_pagamento === "troca" && (
-                                      <span className="text-[8px] bg-sky-50 border border-sky-200 text-sky-600 font-extrabold uppercase px-1.5 py-0.5 rounded shrink-0" title="Este produto saiu como parte de uma troca">
-                                        Troca
-                                      </span>
-                                    )}
+                                  <div className="flex flex-col gap-2.5">
+                                    {v.itens.map((item, idx) => (
+                                      <div key={idx} className="flex items-center gap-2">
+                                        <div>
+                                          <span className="block font-bold text-[#29141B]">
+                                            {item.nome} {item.qty > 1 ? `(x${item.qty})` : ""}
+                                          </span>
+                                          <span className="block text-[10px] text-[#29141B]/60">Cód: {item.codigo || "N/A"}</span>
+                                        </div>
+                                        {v.observacao && v.observacao.includes("[Trocada/Devolvida") && idx === 0 && (
+                                          <span 
+                                            className="text-[8px] bg-rose-50 border border-rose-200 text-rose-600 font-extrabold uppercase px-1.5 py-0.5 rounded shrink-0 cursor-pointer hover:bg-rose-100 hover:border-rose-300 transition-all shadow-sm active:scale-95 flex items-center gap-0.5" 
+                                            title="Clique para rastrear esta troca no histórico"
+                                            onClick={() => handleRastrearTroca(item.bolsa_id, v.cliente_id)}
+                                          >
+                                            <span className="material-symbols-outlined text-[10px]">sync_alt</span>
+                                            Devolvida
+                                          </span>
+                                        )}
+                                        {v.forma_pagamento === "troca" && idx === 0 && (
+                                          <span className="text-[8px] bg-sky-50 border border-sky-200 text-sky-600 font-extrabold uppercase px-1.5 py-0.5 rounded shrink-0" title="Este produto saiu como parte de uma troca">
+                                            Troca
+                                          </span>
+                                        )}
+                                      </div>
+                                    ))}
                                   </div>
                                 </td>
                                 <td className="p-3">
@@ -4619,7 +4593,7 @@ export default function App() {
                                           const { error } = await supabase
                                             .from("vendas")
                                             .update({ funcionario_id: newFid || null })
-                                            .eq("id", v.id);
+                                            .in("id", v.ids);
                                           if (error) throw error;
                                           loadAllData();
                                         } catch (err) {
@@ -4663,7 +4637,7 @@ export default function App() {
                                 </td>
                               </tr>
                             ))}
-                            {vendasPorLoja.length === 0 && (
+                            {vendasAgrupadasPorLoja.length === 0 && (
                               <tr>
                                 <td colSpan={5} className="text-center text-[#29141B]/60 py-12 font-medium bg-white">
                                   Nenhuma saída registrada ainda.
@@ -4676,29 +4650,35 @@ export default function App() {
 
                       {/* Visualização em Cards (Mobile) */}
                       <div className="block md:hidden flex flex-col gap-3">
-                        {vendasPorLoja.map(v => (
+                        {vendasAgrupadasPorLoja.map(v => (
                           <div key={v.id} className="bg-white border border-[#EACAD6]/40 rounded-2xl p-4 flex flex-col gap-3 shadow-sm hover:bg-[#FCFAF9]/50 transition-colors">
                             <div className="flex items-start justify-between gap-2">
-                              <div className="flex items-center gap-2">
-                                <div>
-                                  <span className="block font-bold text-[#29141B] text-sm">{v.bolsas?.nome}</span>
-                                  <span className="block text-[10px] text-[#29141B]/60">Cód: {v.bolsas?.codigo || "N/A"}</span>
-                                </div>
-                                {v.observacao && v.observacao.includes("[Trocada/Devolvida") && (
-                                  <span 
-                                    className="text-[8px] bg-rose-50 border border-rose-200 text-rose-600 font-extrabold uppercase px-1.5 py-0.5 rounded shrink-0 cursor-pointer hover:bg-rose-100 hover:border-rose-300 transition-all shadow-sm active:scale-95 flex items-center gap-0.5" 
-                                    title="Clique para rastrear esta troca no histórico"
-                                    onClick={() => handleRastrearTroca(v.bolsa_id, v.cliente_id)}
-                                  >
-                                    <span className="material-symbols-outlined text-[10px]">sync_alt</span>
-                                    Devolvida
-                                  </span>
-                                )}
-                                {v.forma_pagamento === "troca" && (
-                                  <span className="text-[8px] bg-sky-50 border border-sky-200 text-sky-600 font-extrabold uppercase px-1.5 py-0.5 rounded shrink-0">
-                                    Troca
-                                  </span>
-                                )}
+                              <div className="flex flex-col gap-2 flex-1 min-w-0">
+                                {v.itens.map((item, idx) => (
+                                  <div key={idx} className="flex items-center gap-2">
+                                    <div>
+                                      <span className="block font-bold text-[#29141B] text-sm">
+                                        {item.nome} {item.qty > 1 ? `(x${item.qty})` : ""}
+                                      </span>
+                                      <span className="block text-[10px] text-[#29141B]/60">Cód: {item.codigo || "N/A"}</span>
+                                    </div>
+                                    {v.observacao && v.observacao.includes("[Trocada/Devolvida") && idx === 0 && (
+                                      <span 
+                                        className="text-[8px] bg-rose-50 border border-rose-200 text-rose-600 font-extrabold uppercase px-1.5 py-0.5 rounded shrink-0 cursor-pointer hover:bg-rose-100 hover:border-rose-300 transition-all shadow-sm active:scale-95 flex items-center gap-0.5" 
+                                        title="Clique para rastrear esta troca no histórico"
+                                        onClick={() => handleRastrearTroca(item.bolsa_id, v.cliente_id)}
+                                      >
+                                        <span className="material-symbols-outlined text-[10px]">sync_alt</span>
+                                        Devolvida
+                                      </span>
+                                    )}
+                                    {v.forma_pagamento === "troca" && idx === 0 && (
+                                      <span className="text-[8px] bg-sky-50 border border-sky-200 text-sky-600 font-extrabold uppercase px-1.5 py-0.5 rounded shrink-0">
+                                        Troca
+                                      </span>
+                                    )}
+                                  </div>
+                                ))}
                               </div>
                               <div className="flex flex-col items-end gap-1">
                                 <span className="font-bold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-100 text-xs shrink-0">
@@ -4743,7 +4723,7 @@ export default function App() {
                                       const { error } = await supabase
                                         .from("vendas")
                                         .update({ funcionario_id: newFid || null })
-                                        .eq("id", v.id);
+                                        .in("id", v.ids);
                                       if (error) throw error;
                                       loadAllData();
                                     } catch (err) {
@@ -4766,11 +4746,6 @@ export default function App() {
                             </div>
                           </div>
                         ))}
-                        {vendasPorLoja.length === 0 && (
-                          <div className="text-center text-[#29141B]/60 py-8 font-medium bg-white border border-[#EACAD6]/45 rounded-2xl shadow-sm">
-                            Nenhuma saída registrada ainda.
-                          </div>
-                        )}
                       </div>
                     </section>
                   </div>
@@ -7350,6 +7325,107 @@ export default function App() {
             </div>
           );
         })()}
+      </AnimatePresence>
+
+      {/* ── LOJA SELECTION DRAWER (Premium & Luxury) ── */}
+      <AnimatePresence>
+        {isLojaDrawerOpen && (
+          <>
+            {/* Backdrop com blur luxuoso */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsLojaDrawerOpen(false)}
+              className="fixed inset-0 bg-black/60 backdrop-blur-xs z-[150]"
+            />
+            {/* Gaveta (Drawer) Lateral */}
+            <motion.div
+              initial={{ x: "100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "100%" }}
+              transition={{ type: "spring", damping: 26, stiffness: 220 }}
+              className="fixed top-0 right-0 bottom-0 w-full max-w-[380px] bg-[#1A1A2E] border-l border-[#C9A84C]/25 text-white z-[151] shadow-[0_0_60px_rgba(0,0,0,0.85)] flex flex-col font-sans"
+            >
+              {/* Header do Drawer */}
+              <div className="p-6 border-b border-[#C9A84C]/15 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="material-symbols-outlined text-[#C9A84C] text-[24px]">storefront</span>
+                  <div>
+                    <h3 className="text-sm font-extrabold tracking-widest text-[#C9A84C] uppercase">Selecione a Loja</h3>
+                    <p className="text-[10px] text-white/40">Unidades de atendimento Zero 1</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setIsLojaDrawerOpen(false)}
+                  className="w-8 h-8 rounded-full flex items-center justify-center bg-white/5 hover:bg-white/10 active:scale-95 border border-white/10 text-white/70 hover:text-white transition-all cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[18px]">close</span>
+                </button>
+              </div>
+
+              {/* Lojas List */}
+              <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-3.5">
+                {(profile?.role === 'admin'
+                  ? lojas
+                  : lojas.filter(l => funcionarioLojas.some(fl => fl.funcionario_id === profile.id && fl.loja_id === l.id))
+                ).map(l => {
+                  const isSelected = activeStore?.id === l.id;
+                  const canChange = profile?.role === 'admin' || funcionarioLojas.filter(fl => fl.funcionario_id === profile.id).length > 1;
+                  return (
+                    <button
+                      key={l.id}
+                      onClick={() => {
+                        if (!canChange) return;
+                        handleSetActiveStore(l);
+                        setIsLojaDrawerOpen(false);
+                        triggerToast(`Loja alterada para: ${l.nome}`);
+                      }}
+                      disabled={!canChange}
+                      className={`w-full text-left flex items-center gap-4.5 p-4 rounded-2xl transition-all duration-300 border cursor-pointer ${
+                        isSelected
+                          ? 'bg-[#C9A84C]/10 border-[#C9A84C]/50 shadow-[0_4px_20px_rgba(201,168,76,0.15)]'
+                          : 'hover:bg-white/5 border-white/5 bg-white/[0.01]'
+                      } ${!canChange && 'opacity-50 cursor-not-allowed'}`}
+                    >
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${
+                        isSelected ? 'bg-[#C9A84C]/20 text-[#C9A84C]' : 'bg-white/5 text-white/40'
+                      }`}>
+                        <span className="material-symbols-outlined text-[20px]">store</span>
+                      </div>
+                      <div className="flex flex-col flex-1 min-w-0">
+                        <span className={`text-xs font-bold tracking-wide truncate ${ isSelected ? 'text-[#C9A84C]' : 'text-white/90'}`}>{l.nome}</span>
+                        <span className="text-[9px] text-white/35 mt-0.5">{l.nome === 'Loja Matriz' ? 'Unidade Central' : 'Filial de Operações'}</span>
+                      </div>
+                      {isSelected ? (
+                        <div className="flex items-center gap-1.5 shrink-0 bg-[#C9A84C]/25 border border-[#C9A84C]/40 px-2 py-0.5 rounded-md">
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#C9A84C] animate-pulse" />
+                          <span className="text-[8px] font-black text-[#C9A84C] uppercase tracking-wider">Ativa</span>
+                        </div>
+                      ) : (
+                        <span className="material-symbols-outlined text-[16px] text-white/20 hover:text-white/40 transition-colors">chevron_right</span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Footer do Drawer */}
+              <div className="p-6 border-t border-[#C9A84C]/15 bg-black/20 flex flex-col gap-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-white/45 font-semibold">Operador Logado:</span>
+                  <span className="text-xs font-bold text-white/95">{profile?.nome}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-white/45 font-semibold">Nível de Acesso:</span>
+                  <span className="text-[8px] font-black uppercase tracking-widest bg-[#C9A84C]/10 border border-[#C9A84C]/25 text-[#C9A84C] px-2 py-0.5 rounded-md">
+                    {profile?.role === 'admin' ? 'Administrador' : 'Colaborador'}
+                  </span>
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
       </AnimatePresence>
 
       {/* ── TOAST NOTIFICATION SYSTEM (Premium) ── */}
