@@ -2166,25 +2166,93 @@ export default function App() {
             Sistema {profile?.role === 'admin' ? 'Administrador' : 'Colaborador'}
           </span>
           
-          {/* Seletor de Loja (Substituído por Gaveta) */}
+          {/* Seletor de Loja - Popover Inline (Desktop) */}
           {lojas.length > 0 && activeStore && (
-            <div className="w-full mt-3 px-2">
+            <div className="w-full mt-3 px-2 relative">
               <label className="block text-[9px] font-extrabold text-[#D12D6C] uppercase tracking-wider mb-1.5 text-center select-none">
                 Loja Ativa
               </label>
               <button
                 type="button"
-                onClick={() => setIsLojaDrawerOpen(true)}
-                className="w-full flex items-center justify-between bg-white hover:bg-rose-50 text-[#29141B] border border-[#EACAD6] rounded-xl px-3 py-2 text-xs font-bold shadow-sm transition-all cursor-pointer group"
+                onClick={() => setIsLojaDrawerOpen(prev => !prev)}
+                className={`w-full flex items-center justify-between text-[#29141B] border rounded-xl px-3 py-2 text-xs font-bold shadow-sm transition-all cursor-pointer group ${
+                  isLojaDrawerOpen
+                    ? 'bg-[#1A1A2E] text-white border-[#C9A84C]/60'
+                    : 'bg-white hover:bg-rose-50 border-[#EACAD6]'
+                }`}
               >
                 <div className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[16px] text-[#D12D6C]">store</span>
-                  <span className="truncate">{activeStore.nome}</span>
+                  <span className={`material-symbols-outlined text-[16px] ${ isLojaDrawerOpen ? 'text-[#C9A84C]' : 'text-[#D12D6C]'}`}>store</span>
+                  <span className={`truncate ${isLojaDrawerOpen ? 'text-white' : ''}`}>{activeStore.nome}</span>
                 </div>
-                <span className="material-symbols-outlined text-[16px] text-[#29141B]/40 group-hover:translate-x-0.5 transition-transform">
-                  chevron_right
-                </span>
+                <span className={`material-symbols-outlined text-[14px] transition-transform duration-300 ${
+                  isLojaDrawerOpen ? 'rotate-180 text-[#C9A84C]' : 'text-[#29141B]/40'
+                }`}>expand_more</span>
               </button>
+
+              {/* Popover dropdown - Desktop */}
+              <AnimatePresence>
+                {isLojaDrawerOpen && (
+                  <>
+                    <div className="fixed inset-0 z-[55]" onClick={() => setIsLojaDrawerOpen(false)} />
+                    <motion.div
+                      initial={{ opacity: 0, y: -8, scale: 0.97 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: -8, scale: 0.97 }}
+                      transition={{ duration: 0.18, ease: 'easeOut' }}
+                      className="absolute top-full left-0 right-0 mt-2 z-[60] bg-[#1A1A2E] border border-[#C9A84C]/30 rounded-2xl shadow-[0_12px_40px_rgba(0,0,0,0.5)] overflow-hidden"
+                    >
+                      <div className="px-3 pt-3 pb-1">
+                        <span className="text-[8px] uppercase tracking-widest font-extrabold text-[#C9A84C]/60">Trocar Unidade</span>
+                      </div>
+                      <div className="flex flex-col gap-1 p-2">
+                        {(profile?.role === 'admin'
+                          ? lojas
+                          : lojas.filter(l => funcionarioLojas.some(fl => fl.funcionario_id === profile.id && fl.loja_id === l.id))
+                        ).map(l => {
+                          const isSelected = activeStore?.id === l.id;
+                          const canChange = profile?.role === 'admin' || funcionarioLojas.filter(fl => fl.funcionario_id === profile.id).length > 1;
+                          return (
+                            <button
+                              key={l.id}
+                              onClick={() => {
+                                if (!canChange) return;
+                                handleSetActiveStore(l);
+                                setIsLojaDrawerOpen(false);
+                                triggerToast(`Loja alterada para: ${l.nome}`);
+                              }}
+                              disabled={!canChange}
+                              className={`w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 cursor-pointer ${
+                                isSelected
+                                  ? 'bg-[#C9A84C]/10 border border-[#C9A84C]/40'
+                                  : 'hover:bg-white/5 border border-transparent'
+                              } ${!canChange && 'opacity-60 cursor-not-allowed'}`}
+                            >
+                              <span className={`material-symbols-outlined text-[18px] ${ isSelected ? 'text-[#C9A84C]' : 'text-white/40'}`}>store</span>
+                              <div className="flex flex-col flex-1 min-w-0">
+                                <span className={`text-xs font-bold truncate ${ isSelected ? 'text-[#C9A84C]' : 'text-white'}`}>{l.nome}</span>
+                                <span className="text-[9px] text-white/35">{l.nome === 'Loja Matriz' ? 'Unidade Central' : 'Filial de Operações'}</span>
+                              </div>
+                              {isSelected && (
+                                <div className="flex items-center gap-1 shrink-0">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-[#C9A84C] animate-ping" />
+                                  <span className="text-[8px] font-black text-[#C9A84C] uppercase tracking-wider">Ativa</span>
+                                </div>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <div className="px-4 py-2.5 border-t border-[#C9A84C]/10 flex items-center justify-between">
+                        <span className="text-[8px] text-white/30 font-semibold">{profile?.nome}</span>
+                        <span className={`text-[8px] font-black uppercase tracking-wider ${ profile?.role === 'admin' ? 'text-[#C9A84C]' : 'text-white/40'}`}>
+                          {profile?.role === 'admin' ? 'Admin' : 'Colaborador'}
+                        </span>
+                      </div>
+                    </motion.div>
+                  </>
+                )}
+              </AnimatePresence>
             </div>
           )}
         </div>
@@ -2225,21 +2293,85 @@ export default function App() {
           </button>
         </header>
 
-        {/* Sub-header de Loja Ativa (Mobile Only - Substituído por Gaveta) */}
+        {/* Sub-header de Loja Ativa (Mobile Only - Popover Inline) */}
         {lojas.length > 0 && activeStore && (
-          <div className="md:hidden w-full bg-white border-b border-[#FCEEF3] px-container-padding py-2.5 flex justify-between items-center z-30 print:hidden shadow-xs">
+          <div className="md:hidden w-full bg-white border-b border-[#FCEEF3] px-container-padding py-2.5 flex justify-between items-center z-30 print:hidden shadow-xs relative">
             <span className="text-[10px] font-extrabold text-[#29141B]/60 uppercase tracking-wider">
-              Loja Selecionada:
+              Loja:
             </span>
-            <button
-              type="button"
-              onClick={() => setIsLojaDrawerOpen(true)}
-              className="flex items-center gap-1.5 bg-[#FCFAF9] active:bg-[#FFEBF2] text-[#29141B] border border-[#EACAD6] rounded-xl px-3 py-1 text-xs font-bold transition-all cursor-pointer"
-            >
-              <span className="material-symbols-outlined text-[14px] text-[#D12D6C]">store</span>
-              <span className="max-w-[120px] truncate">{activeStore.nome}</span>
-              <span className="material-symbols-outlined text-[14px] text-[#29141B]/50">unfold_more</span>
-            </button>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setIsLojaDrawerOpen(prev => !prev)}
+                className={`flex items-center gap-1.5 border rounded-xl px-3 py-1 text-xs font-bold transition-all cursor-pointer ${
+                  isLojaDrawerOpen
+                    ? 'bg-[#1A1A2E] text-white border-[#C9A84C]/60'
+                    : 'bg-[#FCFAF9] active:bg-[#FFEBF2] text-[#29141B] border-[#EACAD6]'
+                }`}
+              >
+                <span className={`material-symbols-outlined text-[14px] ${ isLojaDrawerOpen ? 'text-[#C9A84C]' : 'text-[#D12D6C]'}`}>store</span>
+                <span className="max-w-[120px] truncate">{activeStore.nome}</span>
+                <span className={`material-symbols-outlined text-[14px] transition-transform duration-300 ${ isLojaDrawerOpen ? 'rotate-180 text-[#C9A84C]' : 'text-[#29141B]/50'}`}>expand_more</span>
+              </button>
+
+              {/* Popover dropdown - Mobile */}
+              <AnimatePresence>
+                {isLojaDrawerOpen && (
+                  <>
+                    <div className="fixed inset-0 z-[55]" onClick={() => setIsLojaDrawerOpen(false)} />
+                    <motion.div
+                      initial={{ opacity: 0, y: -8, scale: 0.97 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: -8, scale: 0.97 }}
+                      transition={{ duration: 0.18, ease: 'easeOut' }}
+                      className="absolute top-full right-0 mt-2 w-64 z-[60] bg-[#1A1A2E] border border-[#C9A84C]/30 rounded-2xl shadow-[0_12px_40px_rgba(0,0,0,0.5)] overflow-hidden"
+                    >
+                      <div className="px-3 pt-3 pb-1">
+                        <span className="text-[8px] uppercase tracking-widest font-extrabold text-[#C9A84C]/60">Trocar Unidade</span>
+                      </div>
+                      <div className="flex flex-col gap-1 p-2">
+                        {(profile?.role === 'admin'
+                          ? lojas
+                          : lojas.filter(l => funcionarioLojas.some(fl => fl.funcionario_id === profile.id && fl.loja_id === l.id))
+                        ).map(l => {
+                          const isSelected = activeStore?.id === l.id;
+                          const canChange = profile?.role === 'admin' || funcionarioLojas.filter(fl => fl.funcionario_id === profile.id).length > 1;
+                          return (
+                            <button
+                              key={l.id}
+                              onClick={() => {
+                                if (!canChange) return;
+                                handleSetActiveStore(l);
+                                setIsLojaDrawerOpen(false);
+                                triggerToast(`Loja alterada para: ${l.nome}`);
+                              }}
+                              disabled={!canChange}
+                              className={`w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 cursor-pointer ${
+                                isSelected
+                                  ? 'bg-[#C9A84C]/10 border border-[#C9A84C]/40'
+                                  : 'hover:bg-white/5 border border-transparent'
+                              } ${!canChange && 'opacity-60 cursor-not-allowed'}`}
+                            >
+                              <span className={`material-symbols-outlined text-[18px] ${ isSelected ? 'text-[#C9A84C]' : 'text-white/40'}`}>store</span>
+                              <div className="flex flex-col flex-1 min-w-0">
+                                <span className={`text-xs font-bold truncate ${ isSelected ? 'text-[#C9A84C]' : 'text-white'}`}>{l.nome}</span>
+                                <span className="text-[9px] text-white/35">{l.nome === 'Loja Matriz' ? 'Unidade Central' : 'Filial'}</span>
+                              </div>
+                              {isSelected && (
+                                <div className="flex items-center gap-1 shrink-0">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-[#C9A84C] animate-ping" />
+                                  <span className="text-[8px] font-black text-[#C9A84C] uppercase">Ativa</span>
+                                </div>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </motion.div>
+                  </>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
         )}
 
@@ -7218,136 +7350,6 @@ export default function App() {
             </div>
           );
         })()}
-      </AnimatePresence>
-
-      {/* ── GAVETA SELETORA DE LOJA PREMIUM (Taste & Style) ── */}
-      <AnimatePresence>
-        {isLojaDrawerOpen && (
-          <>
-            {/* Backdrop escuro com desfoque */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setIsLojaDrawerOpen(false)}
-              className="fixed inset-0 bg-black/60 backdrop-blur-xs z-[80] print:hidden"
-            />
-            {/* Drawer deslizante */}
-            <motion.div
-              initial={{ x: "100%" }}
-              animate={{ x: 0 }}
-              exit={{ x: "100%" }}
-              transition={{ type: "spring", damping: 25, stiffness: 200 }}
-              className="fixed inset-y-0 right-0 w-full max-w-sm bg-[#1A1A2E] border-l border-[#C9A84C]/30 text-white z-[90] shadow-[0_0_50px_rgba(0,0,0,0.8)] flex flex-col print:hidden"
-            >
-              {/* Cabeçalho da Gaveta */}
-              <div className="p-6 border-b border-[#C9A84C]/20 flex items-center justify-between select-none bg-[#111122]">
-                <div className="flex items-center gap-2.5">
-                  <span className="material-symbols-outlined text-[#C9A84C] text-2xl font-bold animate-pulse">
-                    storefront
-                  </span>
-                  <div>
-                    <h3 className="font-extrabold text-sm tracking-widest text-[#C9A84C] uppercase">
-                      Unidades / Lojas
-                    </h3>
-                    <p className="text-[10px] text-white/50 font-medium">Selecione a loja para operar</p>
-                  </div>
-                </div>
-                
-                <button
-                  onClick={() => setIsLojaDrawerOpen(false)}
-                  className="w-8 h-8 rounded-full border border-white/10 hover:border-[#C9A84C] hover:text-[#C9A84C] bg-white/5 hover:bg-[#C9A84C]/10 flex items-center justify-center transition-all active:scale-90 cursor-pointer"
-                  title="Fechar"
-                >
-                  <span className="material-symbols-outlined text-sm font-bold">close</span>
-                </button>
-              </div>
-
-              {/* Corpo / Lista de Lojas */}
-              <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-4">
-                <span className="text-[9px] uppercase tracking-wider font-extrabold text-[#C9A84C]/70">
-                  Lojas Disponíveis
-                </span>
-                
-                <div className="flex flex-col gap-3">
-                  {(profile?.role === 'admin' 
-                    ? lojas 
-                    : lojas.filter(l => funcionarioLojas.some(fl => fl.funcionario_id === profile.id && fl.loja_id === l.id))
-                  ).map(l => {
-                    const isSelected = activeStore?.id === l.id;
-                    const canChange = profile?.role === 'admin' || funcionarioLojas.filter(fl => fl.funcionario_id === profile.id).length > 1;
-                    
-                    return (
-                      <motion.button
-                        key={l.id}
-                        whileHover={canChange ? { scale: 1.02 } : {}}
-                        whileTap={canChange ? { scale: 0.98 } : {}}
-                        onClick={() => {
-                          if (!canChange) return;
-                          handleSetActiveStore(l);
-                          setIsLojaDrawerOpen(false);
-                          triggerToast(`Loja alterada para: ${l.nome}`);
-                        }}
-                        disabled={!canChange}
-                        className={`w-full text-left p-4 rounded-2xl border transition-all duration-300 flex items-center justify-between cursor-pointer ${
-                          isSelected 
-                            ? "bg-gradient-to-br from-[#1E1E38] to-[#121224] border-[#C9A84C] shadow-[0_4px_20px_rgba(201,168,76,0.15)]" 
-                            : "bg-[#111122]/50 hover:bg-[#1E1E3F]/40 border-white/5 hover:border-[#C9A84C]/30"
-                        } ${!canChange && "opacity-75 cursor-not-allowed"}`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className={`w-9 h-9 rounded-xl flex items-center justify-center border transition-colors ${
-                            isSelected 
-                              ? "bg-[#C9A84C]/10 border-[#C9A84C] text-[#C9A84C]" 
-                              : "bg-white/5 border-white/10 text-white/60"
-                          }`}>
-                            <span className="material-symbols-outlined text-lg">store</span>
-                          </div>
-                          
-                          <div className="flex flex-col">
-                            <span className={`text-xs font-bold transition-colors ${isSelected ? "text-[#C9A84C]" : "text-white"}`}>
-                              {l.nome}
-                            </span>
-                            <span className="text-[9px] text-white/40 mt-0.5">
-                              {l.nome === 'Loja Matriz' ? 'Unidade Central' : 'Filial de Operações'}
-                            </span>
-                          </div>
-                        </div>
-
-                        {isSelected ? (
-                          <div className="flex items-center gap-1 bg-[#C9A84C]/10 border border-[#C9A84C]/30 text-[#C9A84C] text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md">
-                            <span className="w-1.5 h-1.5 rounded-full bg-[#C9A84C] animate-ping shrink-0" />
-                            Ativa
-                          </div>
-                        ) : (
-                          canChange && (
-                            <span className="material-symbols-outlined text-[16px] text-white/30 hover:text-white transition-colors">
-                              arrow_forward
-                            </span>
-                          )
-                        )}
-                      </motion.button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Rodapé da Gaveta */}
-              <div className="p-6 border-t border-[#C9A84C]/10 bg-[#111122] flex flex-col gap-2 select-none">
-                <div className="flex items-center justify-between text-[10px] text-white/50 font-semibold">
-                  <span>Operador Ativo:</span>
-                  <span className="text-white font-bold">{profile?.nome}</span>
-                </div>
-                <div className="flex items-center justify-between text-[10px] text-white/50 font-semibold">
-                  <span>Privilégio de Acesso:</span>
-                  <span className={`font-black text-[9px] uppercase tracking-wider ${profile?.role === 'admin' ? 'text-[#C9A84C]' : 'text-white/70'}`}>
-                    {profile?.role === 'admin' ? 'Administrador Master' : 'Colaborador'}
-                  </span>
-                </div>
-              </div>
-            </motion.div>
-          </>
-        )}
       </AnimatePresence>
 
       {/* ── TOAST NOTIFICATION SYSTEM (Premium) ── */}
