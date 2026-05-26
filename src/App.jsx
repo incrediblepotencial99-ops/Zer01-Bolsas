@@ -56,6 +56,12 @@ export default function App() {
   const [toastMessage, setToastMessage] = useState("");
 
   // App Data State
+  const [lojas, setLojas] = useState([]);
+  const [funcionarioLojas, setFuncionarioLojas] = useState([]);
+  const [activeStore, setActiveStore] = useState(null);
+  const [isAddingStore, setIsAddingStore] = useState(false);
+  const [editingStore, setEditingStore] = useState(null);
+  const [formLoja, setFormLoja] = useState({ nome: "", endereco: "", telefone: "" });
   const [bolsas, setBolsas] = useState([]);
   const [clientes, setClientes] = useState([]);
   const [funcionarios, setFuncionarios] = useState([]);
@@ -103,17 +109,21 @@ export default function App() {
   const [cart, setCart] = useState([]);
   const [descontoVenda, setDescontoVenda] = useState(""); // Desconto manual em R$
   const [buscaCodigoVenda, setBuscaCodigoVenda] = useState("");
+  const [buscaClienteVenda, setBuscaClienteVenda] = useState("");
+  const [isOpenClienteVenda, setIsOpenClienteVenda] = useState(false);
+  const [buscaClienteTroca, setBuscaClienteTroca] = useState("");
+  const [isOpenClienteTroca, setIsOpenClienteTroca] = useState(false);
 
   const handleAdicionarPorCodigo = () => {
     const cod = buscaCodigoVenda.trim().toUpperCase();
     if (!cod) return;
-    const bolsaEncontrada = bolsas.find(b => b.codigo && b.codigo.trim().toUpperCase() === cod);
+    const bolsaEncontrada = bolsasPorLoja.find(b => b.codigo && b.codigo.trim().toUpperCase() === cod);
     if (!bolsaEncontrada) {
-      alert(`Produto com o código "${cod}" não encontrado no estoque.`);
+      triggerToast(`Produto com o código "${cod}" não encontrado no estoque.`);
       return;
     }
     if (bolsaEncontrada.quantidade <= 0) {
-      alert(`Produto "${bolsaEncontrada.nome}" (${cod}) está sem estoque!`);
+      triggerToast(`Produto "${bolsaEncontrada.nome}" (${cod}) está sem estoque.`);
       return;
     }
     addToCart(bolsaEncontrada.id);
@@ -129,11 +139,11 @@ export default function App() {
 
   const addToCart = (bolsaId) => {
     if (!bolsaId) return;
-    const bolsa = bolsas.find(b => b.id === bolsaId);
+    const bolsa = bolsasPorLoja.find(b => b.id === bolsaId);
     if (!bolsa) return;
     
     if (bolsa.quantidade <= 0) {
-      alert("Este produto está sem estoque disponível!");
+      triggerToast("Este produto está sem estoque disponível.");
       return;
     }
     
@@ -141,7 +151,7 @@ export default function App() {
       const existing = prev.find(item => item.id === bolsaId);
       if (existing) {
         if (existing.qty >= bolsa.quantidade) {
-          alert(`Quantidade máxima em estoque atingida para ${bolsa.nome} (${bolsa.quantidade} un).`);
+          triggerToast(`Quantidade máxima em estoque atingida para ${bolsa.nome} (${bolsa.quantidade} un).`);
           return prev;
         }
         return prev.map(item => item.id === bolsaId ? { ...item, qty: item.qty + 1 } : item);
@@ -194,7 +204,7 @@ export default function App() {
   const [showClientPossessions, setShowClientPossessions] = useState(false);
 
   const [formFuncionario, setFormFuncionario] = useState({
-    email: "", password: "", nome: "", role: "funcionario", telefone: ""
+    email: "", password: "", nome: "", role: "funcionario", telefone: "", lojas: []
   });
 
   const [editingFuncionario, setEditingFuncionario] = useState(null);
@@ -296,6 +306,31 @@ export default function App() {
     }
   }, [session, profile]);
 
+  // Initialize activeStore once profile and stores are loaded
+  useEffect(() => {
+    if (profile && lojas.length > 0 && !activeStore) {
+      if (profile.role === "admin") {
+        const defaultStore = lojas.find(l => l.nome === "Loja Matriz") || lojas[0];
+        setActiveStore(defaultStore);
+      } else {
+        const associatedIds = funcionarioLojas
+          .filter(fl => fl.funcionario_id === profile.id)
+          .map(fl => fl.loja_id);
+        const associatedStores = lojas.filter(l => associatedIds.includes(l.id));
+        if (associatedStores.length > 0) {
+          setActiveStore(associatedStores[0]);
+        } else {
+          setActiveStore(lojas[0]);
+        }
+      }
+    }
+  }, [profile, lojas, funcionarioLojas, activeStore]);
+
+  const handleSetActiveStore = (store) => {
+    setActiveStore(store);
+    setCart([]); // Clear cart when switching stores
+  };
+
   const checkIfSystemHasUsers = async () => {
     try {
       const { data: hasUsers, error } = await supabase
@@ -341,6 +376,14 @@ export default function App() {
   const loadAllData = async () => {
     setDataLoading(true);
     try {
+      // Fetch Lojas
+      const { data: lData } = await supabase.from("lojas").select("*").order("nome");
+      setLojas(lData || []);
+
+      // Fetch Funcionario Lojas
+      const { data: flData } = await supabase.from("funcionario_lojas").select("*");
+      setFuncionarioLojas(flData || []);
+
       // 1. Fetch Bolsas
       const { data: bData } = await supabase.from("bolsas").select("*").order("created_at", { ascending: false });
       setBolsas(bData || []);
@@ -458,7 +501,7 @@ export default function App() {
       // Perform OCR automatically
       runOCR(file);
     } catch (err) {
-      alert("Erro no upload da foto: " + err.message);
+      triggerToast("Erro no upload da foto: " + err.message);
     } finally {
       setCameraUploading(false);
     }
@@ -478,13 +521,13 @@ export default function App() {
       
       if (codes && codes[0]) {
         setFormBolsa(prev => ({ ...prev, codigo: codes[0].toUpperCase() }));
-        alert(`Código de etiqueta detectado por OCR: ${codes[0].toUpperCase()}`);
+        triggerToast(`Código de etiqueta detectado por OCR: ${codes[0].toUpperCase()}.`);
       } else {
-        alert("Não foi possível detectar um padrão de código nítido. O texto extraído foi: " + text.substring(0, 100));
+        triggerToast("Não foi possível detectar um padrão de código nítido.");
       }
     } catch (err) {
       console.error(err);
-      alert("Falha no OCR: " + err.message);
+      triggerToast("Falha no OCR: " + err.message);
     } finally {
       setOcrLoading(false);
     }
@@ -499,7 +542,7 @@ export default function App() {
         setFormBolsa(prev => ({ ...prev, codigo: decodedText }));
         html5QrCode.stop().then(() => {
           setShowScanner(false);
-          alert("Código escaneado com sucesso: " + decodedText);
+          triggerToast("Código escaneado com sucesso: " + decodedText);
         }).catch(err => console.error(err));
       };
       
@@ -511,7 +554,7 @@ export default function App() {
         qrCodeSuccessCallback
       ).catch(err => {
         console.error(err);
-        alert("Erro ao iniciar câmera para escaneamento: " + err.message);
+        triggerToast("Erro ao iniciar câmera para escaneamento: " + err.message);
         setShowScanner(false);
       });
     }, 200);
@@ -533,7 +576,7 @@ export default function App() {
     }
     
     if (filteredSales.length === 0) {
-      triggerToast("Nenhuma venda neste período para exportar.");
+      triggerToast("Não há vendas neste período para exportar.");
       return;
     }
     
@@ -578,7 +621,7 @@ export default function App() {
 
   // Share Dashboard Summary (copies to clipboard)
   const handleShareDashboard = () => {
-    const periodoFormatado = dashboardPeriodoInfo.label.toUpperCase();
+    const periodoFormatado = dashboardPeriodoInfo.label;
     const totalFaturado = dashboardStats.totalFaturadoMes.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
     const qtdVendas = dashboardStats.qtdVendasMes;
     
@@ -599,10 +642,10 @@ export default function App() {
 
     if (navigator.clipboard && window.isSecureContext) {
       navigator.clipboard.writeText(textoResumo).then(() => {
-        triggerToast("Resumo copiado para a área de transferência!");
+        triggerToast("Resumo copiado para a área de transferência.");
       }).catch(err => {
         console.error(err);
-        triggerToast("Erro ao copiar resumo.");
+        triggerToast("Erro ao copiar o resumo.");
       });
     } else {
       // Fallback for non-HTTPS (mobile via local IP)
@@ -616,7 +659,7 @@ export default function App() {
         textArea.select();
         document.execCommand("copy");
         document.body.removeChild(textArea);
-        triggerToast("Resumo copiado para a área de transferência!");
+        triggerToast("Resumo copiado para a área de transferência.");
       } catch (err) {
         console.error(err);
       }
@@ -641,17 +684,17 @@ export default function App() {
     
     // Vendas de hoje reais (data atual local)
     const hojeStrLocal = getLocalDateStr(new Date());
-    const vendasHoje = vendas.filter(v => getLocalDateStr(v.created_at) === hojeStrLocal);
+    const vendasHoje = vendasPorLoja.filter(v => getLocalDateStr(v.created_at) === hojeStrLocal);
     const faturamentoHoje = vendasHoje.reduce((acc, v) => acc + (Number(v.preco_vendido) || 0), 0);
     const qtdHoje = vendasHoje.length;
 
     // Métricas de estoque atuais (preço de venda)
-    const totalEstoqueItens = bolsas.reduce((acc, b) => acc + (b.quantidade > 0 ? b.quantidade : 0), 0);
-    const valorEstoqueVenda = bolsas.reduce((acc, b) => acc + (b.quantidade * Number(b.preco_venda)), 0);
-    const totalModelosCadastrados = bolsas.length;
+    const totalEstoqueItens = bolsasPorLoja.reduce((acc, b) => acc + (b.quantidade > 0 ? b.quantidade : 0), 0);
+    const valorEstoqueVenda = bolsasPorLoja.reduce((acc, b) => acc + (b.quantidade * Number(b.preco_venda)), 0);
+    const totalModelosCadastrados = bolsasPorLoja.length;
 
     // Produtos com estoque crítico (abaixo ou igual à quantidade mínima)
-    const estoqueCritico = bolsas
+    const estoqueCritico = bolsasPorLoja
       .filter(b => (b.quantidade || 0) <= (b.quantidade_minima || 2))
       .sort((a, b) => (a.quantidade || 0) - (b.quantidade || 0));
     const totalEstoqueCriticoCount = estoqueCritico.length;
@@ -665,7 +708,7 @@ export default function App() {
       const bolsaId = v.bolsa_id;
       if (bolsaId) {
         if (!topSellersMap[bolsaId]) {
-          const b = bolsas.find(bolsa => bolsa.id === bolsaId);
+          const b = bolsasPorLoja.find(bolsa => bolsa.id === bolsaId);
           topSellersMap[bolsaId] = {
             nome: b ? b.nome : v.bolsas?.nome || "Produto Desconhecido",
             codigo: b ? b.codigo : v.bolsas?.codigo || "—",
@@ -694,8 +737,8 @@ export default function App() {
     ].sort((a, b) => b.value - a.value);
 
     const trocasDetalhadas = relatorioTrocas.map(t => {
-      const bDev = bolsas.find(b => b.id === t.bolsa_devolvida_id);
-      const bNova = bolsas.find(b => b.id === t.bolsa_nova_id);
+      const bDev = bolsasPorLoja.find(b => b.id === t.bolsa_devolvida_id);
+      const bNova = bolsasPorLoja.find(b => b.id === t.bolsa_nova_id);
       
       const precoNova = bNova 
         ? (bNova.desconto_ativo && bNova.preco_desconto ? Number(bNova.preco_desconto) : Number(bNova.preco_venda))
@@ -790,7 +833,7 @@ export default function App() {
   const handleSaveBolsa = async (e) => {
     e.preventDefault();
     if (!formBolsa.codigo || !formBolsa.nome || !formBolsa.preco_venda) {
-      alert("Preencha todos os campos obrigatórios (Código, Nome, Preço Venda)");
+      triggerToast("Preencha todos os campos obrigatórios: código, nome e preço de venda.");
       return;
     }
 
@@ -816,7 +859,7 @@ export default function App() {
           .eq("id", editingBolsa.id);
 
         if (error) throw error;
-        alert("Produto atualizado com sucesso!");
+        triggerToast("Produto atualizado com sucesso.");
         setEditingBolsa(null);
       } else {
         // Check if bolsa code already exists
@@ -843,7 +886,8 @@ export default function App() {
               preco_custo: Number(formBolsa.preco_custo) || existingBolsa.preco_custo,
               preco_venda: Number(formBolsa.preco_venda),
               quantidade: updatedQty,
-              status: "disponivel"
+              status: "disponivel",
+              loja_id: activeStore?.id
             })
             .eq("id", existingBolsa.id)
             .select()
@@ -867,7 +911,8 @@ export default function App() {
               preco_venda: Number(formBolsa.preco_venda),
               quantidade: Number(formBolsa.quantidade || 0),
               quantidade_minima: Number(formBolsa.quantidade_minima || 2),
-              status: "disponivel"
+              status: "disponivel",
+              loja_id: activeStore?.id
             })
             .select()
             .single();
@@ -884,12 +929,13 @@ export default function App() {
             quantidade: Number(formBolsa.quantidade),
             preco_custo: formBolsa.preco_custo ? Number(formBolsa.preco_custo) : null,
             funcionario_id: profile.id,
-            observacao: "Entrada registrada no app"
+            observacao: "Entrada registrada no app",
+            loja_id: activeStore?.id
           });
 
         if (entErr) throw entErr;
 
-        alert("Entrada de estoque salva com sucesso!");
+        triggerToast("Entrada de estoque salva com sucesso.");
       }
 
       setFormBolsa({
@@ -900,7 +946,7 @@ export default function App() {
       loadAllData();
       setActiveTab("estoque");
     } catch (err) {
-      alert("Erro ao salvar produto: " + err.message);
+      triggerToast("Erro ao salvar produto: " + err.message);
     }
   };
 
@@ -908,7 +954,7 @@ export default function App() {
   const handleSaveCliente = async (e) => {
     e.preventDefault();
     if (!formCliente.nome) {
-      alert("Nome é obrigatório!");
+      triggerToast("O nome do cliente é obrigatório.");
       return;
     }
 
@@ -927,7 +973,7 @@ export default function App() {
 
         if (error) throw error;
 
-        alert("Cliente atualizado com sucesso!");
+        triggerToast("Cliente atualizado com sucesso.");
         setEditingCliente(null);
       } else {
         // Insert new client
@@ -948,7 +994,7 @@ export default function App() {
       setFormCliente({ nome: "", telefone: "", email: "", cpf: "" });
       loadAllData();
     } catch (err) {
-      alert("Erro ao salvar cliente: " + err.message);
+      triggerToast("Erro ao salvar cliente: " + err.message);
     }
   };
 
@@ -956,11 +1002,11 @@ export default function App() {
   const handleSaveVenda = async (e) => {
     e.preventDefault();
     if (!formVenda.cliente_id) {
-      alert("Selecione o cliente destinatário!");
+      triggerToast("Selecione o cliente destinatário.");
       return;
     }
     if (cart.length === 0) {
-      alert("Adicione pelo menos um produto ao carrinho!");
+      triggerToast("Adicione pelo menos um produto ao carrinho.");
       return;
     }
 
@@ -969,7 +1015,7 @@ export default function App() {
       for (const item of cart) {
         const bolsa = bolsas.find(b => b.id === item.id);
         if (!bolsa || bolsa.quantidade < item.qty) {
-          alert(`Estoque insuficiente para o produto: ${item.nome}! (Estoque disponível: ${bolsa ? bolsa.quantidade : 0})`);
+          triggerToast(`Estoque insuficiente para o produto: ${item.nome}. (Estoque disponível: ${bolsa ? bolsa.quantidade : 0})`);
           return;
         }
       }
@@ -1042,19 +1088,20 @@ export default function App() {
           p_funcionario_id: formVenda.funcionario_id || profile.id,
           p_forma_pagamento: formVenda.forma_pagamento || "dinheiro",
           p_observacao: formVenda.observacao || null,
-          p_itens: rowsToInsert
+          p_itens: rowsToInsert,
+          p_loja_id: activeStore?.id
         });
 
       if (sellErr) throw sellErr;
 
-      alert("Venda de múltiplos itens registrada com sucesso!");
+      triggerToast("Venda registrada com sucesso.");
       setFormVenda({ bolsa_id: "", cliente_id: "", preco_vendido: "", observacao: "", forma_pagamento: "dinheiro", funcionario_id: "" });
       setCart([]); // Clear the shopping cart
       setDescontoVenda(""); // Reset desconto
       loadAllData();
       setActiveTab("saidas");
     } catch (err) {
-      alert("Erro ao registrar venda: " + err.message);
+      triggerToast("Erro ao registrar venda: " + err.message);
     }
   };
 
@@ -1066,7 +1113,7 @@ export default function App() {
     }
 
     const cod = codigoDevolvido.trim().toUpperCase();
-    const bolsaDev = bolsas.find(b => b.codigo?.toUpperCase() === cod);
+    const bolsaDev = bolsasPorLoja.find(b => b.codigo?.toUpperCase() === cod);
     if (!bolsaDev) {
       setFeedbackDevolvido({ success: false, message: `Código "${cod}" não cadastrado no estoque!` });
       setFormTroca(prev => ({ ...prev, venda_id: "", bolsa_devolvida_id: "" }));
@@ -1075,16 +1122,16 @@ export default function App() {
 
     let vendaCorrespondente = null;
     if (formTroca.cliente_id) {
-      vendaCorrespondente = vendas.find(v => v.bolsa_id === bolsaDev.id && v.cliente_id === formTroca.cliente_id && !v.devolvida);
+      vendaCorrespondente = vendasPorLoja.find(v => v.bolsa_id === bolsaDev.id && v.cliente_id === formTroca.cliente_id && !v.devolvida);
       if (!vendaCorrespondente) {
-        vendaCorrespondente = vendas.find(v => v.bolsa_id === bolsaDev.id && v.cliente_id === formTroca.cliente_id);
+        vendaCorrespondente = vendasPorLoja.find(v => v.bolsa_id === bolsaDev.id && v.cliente_id === formTroca.cliente_id);
       }
     }
     
     if (!vendaCorrespondente) {
-      vendaCorrespondente = vendas.find(v => v.bolsa_id === bolsaDev.id && !v.devolvida);
+      vendaCorrespondente = vendasPorLoja.find(v => v.bolsa_id === bolsaDev.id && !v.devolvida);
       if (!vendaCorrespondente) {
-        vendaCorrespondente = vendas.find(v => v.bolsa_id === bolsaDev.id);
+        vendaCorrespondente = vendasPorLoja.find(v => v.bolsa_id === bolsaDev.id);
       }
     }
 
@@ -1130,7 +1177,7 @@ export default function App() {
     }
 
     const cod = codigoNovo.trim().toUpperCase();
-    const bolsaNova = bolsas.find(b => b.codigo?.toUpperCase() === cod);
+    const bolsaNova = bolsasPorLoja.find(b => b.codigo?.toUpperCase() === cod);
     
     if (!bolsaNova) {
       setFeedbackNovo({ success: false, message: `Código "${cod}" não cadastrado no estoque!` });
@@ -1163,7 +1210,7 @@ export default function App() {
   const handleSaveTroca = async (e) => {
     e.preventDefault();
     if (!formTroca.cliente_id || !formTroca.venda_id || !formTroca.bolsa_devolvida_id || !formTroca.bolsa_nova_id) {
-      alert("Preencha todos os campos da troca!");
+      triggerToast("Preencha todos os campos obrigatórios da troca.");
       return;
     }
 
@@ -1172,12 +1219,12 @@ export default function App() {
       const nova = bolsas.find(b => b.id === formTroca.bolsa_nova_id);
 
       if (!devolvida || !nova) {
-        alert("Produto devolvido ou novo não encontrado!");
+        triggerToast("Produto devolvido ou novo não encontrado.");
         return;
       }
 
       if (nova.quantidade <= 0) {
-        alert("Produto novo escolhido está sem estoque!");
+        triggerToast("O produto novo selecionado está sem estoque.");
         return;
       }
 
@@ -1204,17 +1251,18 @@ export default function App() {
           p_venda_orig_id: formTroca.venda_id || null,
           p_preco_venda_novo: precoNovaCobrado,
           p_desconto_novo: descontoNova,
-          p_tinha_desconto_novo: descontoNova > 0
+          p_tinha_desconto_novo: descontoNova > 0,
+          p_loja_id: activeStore?.id
         });
 
       if (exchangeErr) throw exchangeErr;
 
       if (diferenca > 0) {
-        alert(`Troca concluída! Diferença a pagar: R$ ${diferenca.toFixed(2)} via ${formTroca.forma_pagamento?.toUpperCase() || "PIX"}`);
+        triggerToast(`Troca concluída. Diferença a pagar: R$ ${diferenca.toFixed(2)} via ${formTroca.forma_pagamento || "Pix"}.`);
       } else if (diferenca < 0) {
-        alert(`Troca concluída! O cliente ficou com um crédito de: R$ ${Math.abs(diferenca).toFixed(2)} na loja.`);
+        triggerToast(`Troca concluída. O cliente possui um crédito de R$ ${Math.abs(diferenca).toFixed(2)} na loja.`);
       } else {
-        alert(`Troca concluída! Sem diferença de valor.`);
+        triggerToast("Troca concluída sem diferença de valores.");
       }
 
       setFormTroca({ cliente_id: "", venda_id: "", bolsa_devolvida_id: "", bolsa_nova_id: "", motivo: "", forma_pagamento: "pix", desconto_novo: 0 });
@@ -1225,7 +1273,7 @@ export default function App() {
       loadAllData();
       setActiveTab("troca");
     } catch (err) {
-      alert("Erro ao registrar troca: " + err.message);
+      triggerToast("Erro ao registrar troca: " + err.message);
     }
   };
 
@@ -1253,7 +1301,7 @@ export default function App() {
         setHighlightedExchangeId(null);
       }, 3000);
     } else {
-      alert("Aviso: Registro detalhado desta troca não foi localizado no histórico.");
+      triggerToast("Aviso: O registro detalhado desta troca não foi localizado no histórico.");
     }
   };
 
@@ -1271,7 +1319,7 @@ export default function App() {
       if (error) throw error;
       loadAllData();
     } catch (err) {
-      alert("Erro ao atualizar desconto: " + err.message);
+      triggerToast("Erro ao atualizar desconto: " + err.message);
     }
   };
 
@@ -1285,9 +1333,9 @@ export default function App() {
 
       if (error) throw error;
       loadAllData();
-      alert("Status do funcionário atualizado!");
+      triggerToast("Status do colaborador atualizado com sucesso.");
     } catch (err) {
-      alert("Erro ao atualizar status: " + err.message);
+      triggerToast("Erro ao atualizar status: " + err.message);
     }
   };
 
@@ -1296,9 +1344,50 @@ export default function App() {
     setBolsas(prev => prev.map(b => b.id === bolsaId ? { ...b, tempPromo: val } : b));
   };
 
+  const clientesFiltradosVenda = useMemo(() => {
+    if (!buscaClienteVenda.trim()) return clientes;
+    const termo = buscaClienteVenda.toLowerCase();
+    return clientes.filter(c => 
+      c.nome.toLowerCase().includes(termo) ||
+      (c.cpf && c.cpf.replace(/\D/g, "").includes(termo.replace(/\D/g, ""))) ||
+      (c.telefone && c.telefone.replace(/\D/g, "").includes(termo.replace(/\D/g, "")))
+    );
+  }, [clientes, buscaClienteVenda]);
+
+  const clientesFiltradosTroca = useMemo(() => {
+    if (!buscaClienteTroca.trim()) return clientes;
+    const termo = buscaClienteTroca.toLowerCase();
+    return clientes.filter(c => 
+      c.nome.toLowerCase().includes(termo) ||
+      (c.cpf && c.cpf.replace(/\D/g, "").includes(termo.replace(/\D/g, ""))) ||
+      (c.telefone && c.telefone.replace(/\D/g, "").includes(termo.replace(/\D/g, "")))
+    );
+  }, [clientes, buscaClienteTroca]);
+
+  // Store-filtered arrays
+  const bolsasPorLoja = useMemo(() => {
+    if (!activeStore) return bolsas;
+    return bolsas.filter(b => b.loja_id === activeStore.id);
+  }, [bolsas, activeStore]);
+
+  const vendasPorLoja = useMemo(() => {
+    if (!activeStore) return vendas;
+    return vendas.filter(v => v.loja_id === activeStore.id);
+  }, [vendas, activeStore]);
+
+  const trocasPorLoja = useMemo(() => {
+    if (!activeStore) return trocas;
+    return trocas.filter(t => t.loja_id === activeStore.id);
+  }, [trocas, activeStore]);
+
+  const entradasPorLoja = useMemo(() => {
+    if (!activeStore) return entradas;
+    return entradas.filter(e => e.loja_id === activeStore.id);
+  }, [entradas, activeStore]);
+
   // Filtering Bolsas for stock page
   const filteredBolsas = useMemo(() => {
-    return bolsas.filter(b => {
+    return bolsasPorLoja.filter(b => {
       const matchesSearch = b.nome.toLowerCase().includes(searchQuery.toLowerCase()) || 
                             b.codigo.toLowerCase().includes(searchQuery.toLowerCase()) ||
                             (b.marca && b.marca.toLowerCase().includes(searchQuery.toLowerCase()));
@@ -1317,35 +1406,35 @@ export default function App() {
 
       return matchesSearch && matchesMarca && matchesCor && matchesStatus && matchesDesconto;
     });
-  }, [bolsas, searchQuery, filterMarca, filterCor, filterStatus, filterDesconto]);
+  }, [bolsasPorLoja, searchQuery, filterMarca, filterCor, filterStatus, filterDesconto]);
 
   // Unique list values for filtering
-  const marcasList = useMemo(() => [...new Set(bolsas.map(b => b.marca).filter(Boolean))], [bolsas]);
-  const coresList = useMemo(() => [...new Set(bolsas.map(b => b.cor).filter(Boolean))], [bolsas]);
+  const marcasList = useMemo(() => [...new Set(bolsasPorLoja.map(b => b.marca).filter(Boolean))], [bolsasPorLoja]);
+  const coresList = useMemo(() => [...new Set(bolsasPorLoja.map(b => b.cor).filter(Boolean))], [bolsasPorLoja]);
 
   // Dashboard Vendas Filtradas (must be declared before dashboardStats)
   const dashboardVendasFiltradas = useMemo(() => {
-    if (!dashboardDataInicio || !dashboardDataFim) return vendas;
-    return vendas.filter(v => {
+    if (!dashboardDataInicio || !dashboardDataFim) return vendasPorLoja;
+    return vendasPorLoja.filter(v => {
       const dataVStr = getLocalDateStr(v.created_at);
       return dataVStr >= dashboardDataInicio && dataVStr <= dashboardDataFim;
     });
-  }, [vendas, dashboardDataInicio, dashboardDataFim]);
+  }, [vendasPorLoja, dashboardDataInicio, dashboardDataFim]);
 
   // Dashboard Trocas Filtradas (must be declared before dashboardStats)
   const dashboardTrocasFiltradas = useMemo(() => {
-    if (!dashboardDataInicio || !dashboardDataFim) return trocas;
-    return trocas.filter(t => {
+    if (!dashboardDataInicio || !dashboardDataFim) return trocasPorLoja;
+    return trocasPorLoja.filter(t => {
       const dataTStr = getLocalDateStr(t.created_at || t.data);
       return dataTStr >= dashboardDataInicio && dataTStr <= dashboardDataFim;
     });
-  }, [trocas, dashboardDataInicio, dashboardDataFim]);
+  }, [trocasPorLoja, dashboardDataInicio, dashboardDataFim]);
 
   // Financial Dashboard calculation
   const dashboardStats = useMemo(() => {
-    const totalDisponiveis = bolsas.reduce((acc, b) => acc + (b.quantidade > 0 ? b.quantidade : 0), 0);
-    const valorTotalEstoque = bolsas.reduce((acc, b) => acc + (b.quantidade * Number(b.preco_venda)), 0);
-    const totalDescontos = bolsas.filter(b => b.desconto_ativo).length;
+    const totalDisponiveis = bolsasPorLoja.reduce((acc, b) => acc + (b.quantidade > 0 ? b.quantidade : 0), 0);
+    const valorTotalEstoque = bolsasPorLoja.reduce((acc, b) => acc + (b.quantidade * Number(b.preco_venda)), 0);
+    const totalDescontos = bolsasPorLoja.filter(b => b.desconto_ativo).length;
     
     // Filtrando vendas por período e vendedor
     let vendasFiltro = dashboardVendasFiltradas;
@@ -1364,17 +1453,17 @@ export default function App() {
     const qtdVendasMes = vendasFiltro.filter(v => !v.devolvida).length;
 
     // Alertas de estoque baixo
-    const alertasEstoque = bolsas.filter(b => b.quantidade <= Math.max(Number(b.quantidade_minima || 0), 2));
+    const alertasEstoque = bolsasPorLoja.filter(b => b.quantidade <= Math.max(Number(b.quantidade_minima || 0), 2));
 
     // Faturamento Diário (Faturamento de Hoje) usando string YYYY-MM-DD local
-    let vendasHoje = vendas.filter(v => {
+    let vendasHoje = vendasPorLoja.filter(v => {
       return getLocalDateStr(v.created_at) === hojeStr;
     });
     if (dashboardVendedorFilter && dashboardVendedorFilter !== "all") {
       vendasHoje = vendasHoje.filter(v => v.funcionario_id === dashboardVendedorFilter);
     }
 
-    let trocasHoje = trocas.filter(t => {
+    let trocasHoje = trocasPorLoja.filter(t => {
       return getLocalDateStr(t.created_at || t.data) === hojeStr;
     });
     if (dashboardVendedorFilter && dashboardVendedorFilter !== "all") {
@@ -1395,7 +1484,7 @@ export default function App() {
       faturamentoHoje,
       qtdVendasHoje
     };
-  }, [bolsas, vendas, trocas, dashboardVendasFiltradas, dashboardTrocasFiltradas, dashboardVendedorFilter]);
+  }, [bolsasPorLoja, vendasPorLoja, trocasPorLoja, dashboardVendasFiltradas, dashboardTrocasFiltradas, dashboardVendedorFilter]);
 
   // Handle keyboard shortcuts (Alt + P, Alt + C, Alt + F, Alt + D, Alt + S) and Escape key
   useEffect(() => {
@@ -1422,7 +1511,7 @@ export default function App() {
           e.preventDefault();
           setDashboardDateFilter(new Date());
           setDashboardVendedorFilter("all");
-          triggerToast("Filtros de faturamento limpos!");
+          triggerToast("Filtros de faturamento redefinidos com sucesso.");
         } else if (key === "c") {
           e.preventDefault();
           setShowMonthSelector(prev => !prev);
@@ -1516,27 +1605,27 @@ export default function App() {
     });
 
     // Trocas não entram no faturamento do vendedor para evitar dupla dedução/ajustes negativos de caixa
-    return Object.values(mapa).sort((a, b) => b.total - a.total);
+    return Object.values(mapa).filter(v => v.total > 0).sort((a, b) => b.total - a.total);
   }, [dashboardVendasFiltradas, dashboardTrocasFiltradas, funcionarios]);
 
   // Relatorios Vendas Filtradas
   const relatorioVendas = useMemo(() => {
-    if (!relatorioDataInicio || !relatorioDataFim) return vendas;
+    if (!relatorioDataInicio || !relatorioDataFim) return vendasPorLoja;
     
-    return vendas.filter(v => {
+    return vendasPorLoja.filter(v => {
       const dataVStr = getLocalDateStr(v.created_at);
       return dataVStr >= relatorioDataInicio && dataVStr <= relatorioDataFim;
     });
-  }, [vendas, relatorioDataInicio, relatorioDataFim]);
+  }, [vendasPorLoja, relatorioDataInicio, relatorioDataFim]);
 
   // Trocas filtradas pelo período do relatório
   const relatorioTrocas = useMemo(() => {
-    if (!relatorioDataInicio || !relatorioDataFim) return trocas;
-    return trocas.filter(t => {
+    if (!relatorioDataInicio || !relatorioDataFim) return trocasPorLoja;
+    return trocasPorLoja.filter(t => {
       const dataStr = getLocalDateStr(t.created_at || t.data);
       return dataStr >= relatorioDataInicio && dataStr <= relatorioDataFim;
     });
-  }, [trocas, relatorioDataInicio, relatorioDataFim]);
+  }, [trocasPorLoja, relatorioDataInicio, relatorioDataFim]);
 
   const relatorioStats = useMemo(() => {
     let dinheiro = 0;
@@ -1608,7 +1697,7 @@ export default function App() {
     });
 
     // Trocas não entram no faturamento do vendedor para evitar dupla dedução/ajustes negativos de caixa
-    return Object.values(mapa).sort((a, b) => b.total - a.total);
+    return Object.values(mapa).filter(v => v.total > 0).sort((a, b) => b.total - a.total);
   }, [relatorioVendas, relatorioTrocas, funcionarios]);
 
   // Faturamento Mensal Acumulado - Mês Corrente (Seção 9 do Relatório)
@@ -1618,7 +1707,7 @@ export default function App() {
     const mesAtual = dataReferencia.getMonth(); // 0-11
     
     // Filtrar todas as vendas do mês (apenas as ativas, não devolvidas)
-    const vendasMesAtual = vendas.filter(v => {
+    const vendasMesAtual = vendasPorLoja.filter(v => {
       const d = new Date(v.created_at);
       return d.getFullYear() === anoAtual && d.getMonth() === mesAtual && !v.devolvida;
     });
@@ -1680,12 +1769,12 @@ export default function App() {
     // Comparativo com mês anterior se disponível
     const mesAnterior = mesAtual === 0 ? 11 : mesAtual - 1;
     const anoAnterior = mesAtual === 0 ? anoAtual - 1 : anoAtual;
-    const vendasMesAnterior = vendas.filter(v => {
+    const vendasMesAnterior = vendasPorLoja.filter(v => {
       const d = new Date(v.created_at);
       return d.getFullYear() === anoAnterior && d.getMonth() === mesAnterior;
     });
 
-    const trocasMesAnterior = trocas.filter(t => {
+    const trocasMesAnterior = trocasPorLoja.filter(t => {
       const d = new Date(t.created_at || t.data);
       return d.getFullYear() === anoAnterior && d.getMonth() === mesAnterior;
     });
@@ -1712,16 +1801,16 @@ export default function App() {
       anoAtual,
       diaLimite
     };
-  }, [vendas, trocas, relatorioDataFim]);
+  }, [vendasPorLoja, trocasPorLoja, relatorioDataFim]);
 
   // Entradas de estoque filtradas pelo período do relatório
   const relatorioEntradas = useMemo(() => {
-    if (!relatorioDataInicio || !relatorioDataFim) return entradas;
-    return entradas.filter(e => {
+    if (!relatorioDataInicio || !relatorioDataFim) return entradasPorLoja;
+    return entradasPorLoja.filter(e => {
       const dataStr = getLocalDateStr(e.created_at);
       return dataStr >= relatorioDataInicio && dataStr <= relatorioDataFim;
     });
-  }, [entradas, relatorioDataInicio, relatorioDataFim]);
+  }, [entradasPorLoja, relatorioDataInicio, relatorioDataFim]);
 
   // Total de unidades que entraram no estoque no período
   const totalEntradasPeriodo = useMemo(() => {
@@ -1731,9 +1820,9 @@ export default function App() {
   // Agrupar faturamento e quantidade de vendas por data YYYY-MM-DD (filtrado por vendedor)
   const faturamentoPorDia = useMemo(() => {
     const mapa = {};
-    let vendasFiltro = vendas;
+    let vendasFiltro = vendasPorLoja;
     if (dashboardVendedorFilter && dashboardVendedorFilter !== "all") {
-      vendasFiltro = vendas.filter(v => v.funcionario_id === dashboardVendedorFilter);
+      vendasFiltro = vendasPorLoja.filter(v => v.funcionario_id === dashboardVendedorFilter);
     }
 
     vendasFiltro.forEach(v => {
@@ -1750,7 +1839,7 @@ export default function App() {
     });
 
     return mapa;
-  }, [vendas, dashboardVendedorFilter]);
+  }, [vendasPorLoja, dashboardVendedorFilter]);
 
   // Gráfico de faturamento dos últimos 7 dias (baseado na data selecionada no dashboard)
   const dadosGrafico7Dias = useMemo(() => {
@@ -2072,9 +2161,40 @@ export default function App() {
             alt="Logo Zero 1 Bags" 
             className="w-40 h-16 object-contain mb-2"
           />
-          <span className="font-extrabold text-[10px] text-[#29141B]/55 tracking-widest uppercase">
+          <span className="font-extrabold text-[10px] text-[#29141B]/55 tracking-widest uppercase mb-1">
             Sistema {profile?.role === 'admin' ? 'Administrador' : 'Colaborador'}
           </span>
+          
+          {/* Seletor de Loja (Tema Rosa / Fundo Claro) */}
+          {lojas.length > 0 && activeStore && (
+            <div className="w-full mt-3 px-2">
+              <label className="block text-[9px] font-extrabold text-[#D12D6C] uppercase tracking-wider mb-1 text-center select-none">
+                Loja Ativa
+              </label>
+              <div className="relative">
+                <select
+                  value={activeStore.id}
+                  onChange={(e) => {
+                    const selected = lojas.find(l => l.id === e.target.value);
+                    if (selected) handleSetActiveStore(selected);
+                  }}
+                  disabled={profile?.role !== 'admin' && funcionarioLojas.filter(fl => fl.funcionario_id === profile.id).length <= 1}
+                  className="w-full bg-white text-[#29141B] border border-[#EACAD6] rounded-xl px-3 py-1.5 text-xs font-bold focus:ring-1 focus:ring-[#D12D6C] focus:border-[#D12D6C] outline-none cursor-pointer shadow-sm transition-all text-center"
+                >
+                  {profile?.role === 'admin' 
+                    ? lojas.map(l => (
+                        <option key={l.id} value={l.id}>{l.nome}</option>
+                      ))
+                    : lojas
+                        .filter(l => funcionarioLojas.some(fl => fl.funcionario_id === profile.id && fl.loja_id === l.id))
+                        .map(l => (
+                          <option key={l.id} value={l.id}>{l.nome}</option>
+                        ))
+                  }
+                </select>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Nav list */}
@@ -2112,6 +2232,35 @@ export default function App() {
             <span className="material-symbols-outlined text-[20px]">logout</span>
           </button>
         </header>
+
+        {/* Sub-header de Loja Ativa (Mobile Only) */}
+        {lojas.length > 0 && activeStore && (
+          <div className="md:hidden w-full bg-white border-b border-[#FCEEF3] px-container-padding py-2 flex justify-between items-center z-30 print:hidden shadow-xs">
+            <span className="text-[10px] font-extrabold text-[#29141B]/60 uppercase tracking-wider">
+              Loja Selecionada:
+            </span>
+            <select
+              value={activeStore.id}
+              onChange={(e) => {
+                const selected = lojas.find(l => l.id === e.target.value);
+                if (selected) handleSetActiveStore(selected);
+              }}
+              disabled={profile?.role !== 'admin' && funcionarioLojas.filter(fl => fl.funcionario_id === profile.id).length <= 1}
+              className="bg-[#FCFAF9] text-[#29141B] border border-[#EACAD6] rounded-xl px-2 py-1 text-xs font-bold focus:ring-1 focus:ring-[#D12D6C] focus:border-[#D12D6C] outline-none cursor-pointer max-w-[180px]"
+            >
+              {profile?.role === 'admin' 
+                ? lojas.map(l => (
+                    <option key={l.id} value={l.id}>{l.nome}</option>
+                  ))
+                : lojas
+                    .filter(l => funcionarioLojas.some(fl => fl.funcionario_id === profile.id && fl.loja_id === l.id))
+                    .map(l => (
+                      <option key={l.id} value={l.id}>{l.nome}</option>
+                    ))
+              }
+            </select>
+          </div>
+        )}
 
         {/* Desktop title / contextual topbar */}
         <header className="hidden md:flex justify-between items-center px-8 h-20 w-full bg-white/90 backdrop-blur-md sticky top-0 z-40 border-b border-outline-variant shadow-none">
@@ -2288,7 +2437,7 @@ export default function App() {
                                 // Sincroniza o dashboardDateFilter para o mês da data de início para manter o calendário correto
                                 const dIni = new Date(opcao.inicio + "T12:00:00");
                                 setDashboardDateFilter(dIni);
-                                triggerToast(`Dashboard filtrado para: ${opcao.label}`);
+                                triggerToast(`Painel filtrado para: ${opcao.label}.`);
                               }}
                               className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold transition-all duration-150 active:scale-95 border cursor-pointer ${
                                 ativo 
@@ -2316,7 +2465,7 @@ export default function App() {
                           
                           setDashboardDataInicio(startStr);
                           setDashboardDataFim(endStr);
-                          triggerToast("Filtros do dashboard redefinidos para o mês atual!");
+                          triggerToast("Filtros do painel redefinidos para o mês atual.");
                         }}
                         className="bg-[#FCFAF9] hover:bg-[#FFEBF2] border border-[#EACAD6] hover:border-[#D12D6C] rounded-full py-1 px-3 flex items-center gap-1.5 shrink-0 transition-all active:scale-95 shadow-sm group cursor-pointer" 
                         title="Clique para resetar filtros"
@@ -2369,7 +2518,7 @@ export default function App() {
                                         
                                         setDashboardDataInicio(startStr);
                                         setDashboardDataFim(endStr);
-                                        triggerToast(`Dashboard atualizado para ${m.toLocaleString("pt-BR", { month: "long", year: "numeric" }).toUpperCase()}`);
+                                        triggerToast(`Painel atualizado para ${m.toLocaleString("pt-BR", { month: "long", year: "numeric" })}.`);
                                       }}
                                       className={`text-left text-xs px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer ${isSelected ? "bg-[#FFEBF2] text-[#D12D6C]" : "text-[#29141B] hover:bg-[#FCFAF9]"}`}
                                     >
@@ -2404,7 +2553,7 @@ export default function App() {
                                   onClick={() => {
                                     setDashboardVendedorFilter("all");
                                     setShowFilterDropdown(false);
-                                    triggerToast("Exibindo vendas de toda a equipe");
+                                    triggerToast("Exibindo vendas de toda a equipe.");
                                   }}
                                   className={`text-left text-xs px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer ${dashboardVendedorFilter === "all" ? "bg-[#FFEBF2] text-[#D12D6C]" : "text-[#29141B] hover:bg-[#FCFAF9]"}`}
                                 >
@@ -2420,7 +2569,7 @@ export default function App() {
                                         onClick={() => {
                                           setDashboardVendedorFilter(f.id);
                                           setShowFilterDropdown(false);
-                                          triggerToast(`Faturamento filtrado para: ${f.nome}`);
+                                          triggerToast(`Faturamento filtrado para: ${f.nome}.`);
                                         }}
                                         className={`text-left text-xs px-3 py-1.5 rounded-xl font-bold transition-all truncate cursor-pointer ${isSelected ? "bg-[#FFEBF2] text-[#D12D6C]" : "text-[#29141B] hover:bg-[#FCFAF9]"}`}
                                         title={f.nome}
@@ -2765,7 +2914,7 @@ export default function App() {
                                   const dataStr = `${anoVal}-${mesVal}-${diaVal}`;
                                   setDashboardDataInicio(dataStr);
                                   setDashboardDataFim(dataStr);
-                                  triggerToast(`Dashboard filtrado para o dia ${diaVal}/${mesVal}/${anoVal}`);
+                                  triggerToast(`Painel filtrado para o dia ${diaVal}/${mesVal}/${anoVal}.`);
                                 }}
                                 title={`${d.dia}/${mesAnoExibido.getMonth()+1} - Faturamento: R$ ${d.faturamento.toFixed(2)}`}
                                 className={`w-6 h-6 mx-auto flex items-center justify-center rounded-full transition-all relative group active:scale-90 ${
@@ -2815,7 +2964,7 @@ export default function App() {
                               const hojeStr = hoje.toISOString().split("T")[0];
                               setDashboardDataInicio(hojeStr);
                               setDashboardDataFim(hojeStr);
-                              triggerToast("Dashboard redefinido para o dia de Hoje!");
+                              triggerToast("Painel redefinido para o dia de hoje.");
                             }}
                             className="mt-3 text-[10px] font-bold uppercase tracking-wider text-[#D12D6C] bg-[#FFEBF2] border border-[#D12D6C]/20 hover:bg-[#D12D6C] hover:text-white transition-all py-2 px-3 rounded-xl flex items-center justify-center gap-1.5 w-full active:scale-98 text-xs font-semibold"
                           >
@@ -2841,7 +2990,7 @@ export default function App() {
                         <span className="material-symbols-outlined text-sm text-[#D12D6C] bg-[#FFEBF2] border border-[#D12D6C]/10 p-1.5 rounded-xl shadow-sm group-hover:scale-110 transition-transform">category</span>
                       </div>
                       <div className="mt-2">
-                        <div className="text-2xl font-extrabold text-[#29141B] tracking-tight">{bolsas.length} <span className="text-[10px] text-[#29141B]/75 font-black uppercase tracking-wider">Modelos</span></div>
+                        <div className="text-2xl font-extrabold text-[#29141B] tracking-tight">{bolsasPorLoja.length} <span className="text-[10px] text-[#29141B]/75 font-black uppercase tracking-wider">Modelos</span></div>
                         <div className="mt-1">
                           <span className="text-[9px] bg-emerald-50 text-emerald-700 border border-emerald-200/50 font-extrabold py-0.5 px-2 rounded-full inline-flex items-center gap-1 shadow-sm">
                             🟢 {dashboardStats.totalDisponiveis} bolsas em estoque
@@ -2860,7 +3009,7 @@ export default function App() {
                         <span className="material-symbols-outlined text-sm text-[#FC5897] bg-[#FC5897]/10 border border-[#FC5897]/20 p-1.5 rounded-xl shadow-sm group-hover:scale-110 transition-transform">sell</span>
                       </div>
                       <div className="mt-2">
-                        <div className="text-2xl font-extrabold text-[#29141B] tracking-tight">{vendas.length} <span className="text-[10px] text-[#29141B]/75 font-black uppercase tracking-wider">Registradas</span></div>
+                        <div className="text-2xl font-extrabold text-[#29141B] tracking-tight">{vendasPorLoja.length} <span className="text-[10px] text-[#29141B]/75 font-black uppercase tracking-wider">Registradas</span></div>
                         <div className="mt-1">
                           <span className="text-[9px] bg-[#29141B]/[0.04] text-[#29141B]/80 font-black py-0.5 px-2 rounded-full inline-flex items-center gap-1 border border-[#29141B]/10 shadow-sm">
                             📊 Acumulado histórico
@@ -3094,7 +3243,7 @@ export default function App() {
                         Visão Geral do Estoque
                       </h2>
                       <div className="grid gap-2 max-h-[300px] overflow-y-auto pr-1">
-                        {bolsas.map(p => {
+                        {bolsasPorLoja.map(p => {
                           const isLow = p.quantidade <= Math.max(Number(p.quantidade_minima || 0), 2);
                           return (
                             <div 
@@ -3123,7 +3272,7 @@ export default function App() {
                             </div>
                           );
                         })}
-                        {bolsas.length === 0 && (
+                        {bolsasPorLoja.length === 0 && (
                           <div className="bg-white border border-[#FCEEF3] rounded-xl p-10 text-center text-[#29141B]/60 text-xs">
                             Nenhum produto cadastrado no estoque.
                           </div>
@@ -3625,8 +3774,8 @@ export default function App() {
                                             onClick={async () => {
                                               if (confirm(`Deseja realmente excluir o produto ${b.nome}?`)) {
                                                 const { error } = await supabase.from("bolsas").delete().eq("id", b.id);
-                                                if (error) alert("Erro ao excluir: " + error.message);
-                                                else { alert("Produto excluído com sucesso!"); loadAllData(); }
+                                                if (error) triggerToast("Erro ao excluir: " + error.message);
+                                                else { triggerToast("Produto excluído com sucesso."); loadAllData(); }
                                               }
                                             }}
                                             className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-600 border border-rose-200 text-rose-600 hover:text-white transition-all flex items-center justify-center shadow-xs"
@@ -3770,8 +3919,8 @@ export default function App() {
                                           onClick={async () => {
                                             if (confirm(`Deseja realmente excluir o produto ${b.nome}?`)) {
                                               const { error } = await supabase.from("bolsas").delete().eq("id", b.id);
-                                              if (error) alert("Erro ao excluir: " + error.message);
-                                              else { alert("Produto excluído com sucesso!"); loadAllData(); }
+                                              if (error) triggerToast("Erro ao excluir: " + error.message);
+                                              else { triggerToast("Produto excluído com sucesso."); loadAllData(); }
                                             }
                                           }}
                                           className="bg-rose-50 hover:bg-rose-600 border border-rose-200 text-rose-600 hover:text-white py-1.5 px-3 rounded-xl text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 transition-all shadow-xs"
@@ -3918,8 +4067,8 @@ export default function App() {
                                       onClick={async () => {
                                         if (confirm(`Deseja realmente excluir o produto ${b.nome}?`)) {
                                           const { error } = await supabase.from("bolsas").delete().eq("id", b.id);
-                                          if (error) alert("Erro ao excluir: " + error.message);
-                                          else { alert("Produto excluído com sucesso!"); loadAllData(); }
+                                          if (error) triggerToast("Erro ao excluir: " + error.message);
+                                          else { triggerToast("Produto excluído com sucesso."); loadAllData(); }
                                         }
                                       }}
                                       className="p-1 rounded text-rose-600 hover:bg-rose-50 transition-colors"
@@ -3996,7 +4145,7 @@ export default function App() {
                             className="h-11 w-full rounded-xl border border-[#EACAD6] bg-white px-3 text-[#29141B] placeholder-[#29141B]/55 focus:border-[#D12D6C] focus:ring-1 focus:ring-[#D12D6C] focus:outline-none transition-all shadow-sm text-sm cursor-pointer"
                           >
                             <option value="" disabled hidden>Selecionar produto...</option>
-                            {bolsas.filter(b => b.quantidade > 0).map(b => (
+                            {bolsasPorLoja.filter(b => b.quantidade > 0).map(b => (
                               <option key={b.id} value={b.id}>
                                 {b.nome} ({b.codigo}) — R$ {b.desconto_ativo && b.preco_desconto ? Number(b.preco_desconto).toFixed(2) : Number(b.preco_venda).toFixed(2)} • Est: {b.quantidade}
                               </option>
@@ -4111,19 +4260,76 @@ export default function App() {
 
                         <div className="flex flex-col gap-1">
                           <label className="text-[10px] font-bold text-[#29141B]/85 uppercase tracking-wider">Cliente</label>
-                          <select 
-                            required 
-                            value={formVenda.cliente_id} 
-                            onChange={e => setFormVenda({ ...formVenda, cliente_id: e.target.value })}
-                            className="h-11 w-full rounded-xl border border-[#EACAD6] bg-white px-3 text-[#29141B] placeholder-[#29141B]/55 focus:border-[#D12D6C] focus:ring-1 focus:ring-[#D12D6C] focus:outline-none transition-all shadow-sm text-sm cursor-pointer"
-                          >
-                            <option value="" disabled hidden>Selecione o cliente...</option>
-                            {clientes.map(c => (
-                              <option key={c.id} value={c.id}>
-                                {c.nome} {c.cpf ? `(CPF: ${c.cpf})` : ""}
-                              </option>
-                            ))}
-                          </select>
+                          <div className="relative">
+                            <button
+                              type="button"
+                              onClick={() => setIsOpenClienteVenda(!isOpenClienteVenda)}
+                              className="h-11 w-full rounded-xl border border-[#EACAD6] bg-white px-3 text-left text-[#29141B] focus:border-[#D12D6C] focus:ring-1 focus:ring-[#D12D6C] focus:outline-none transition-all shadow-sm text-sm flex items-center justify-between cursor-pointer"
+                            >
+                              <span className="truncate">
+                                {formVenda.cliente_id 
+                                  ? clientes.find(c => c.id === formVenda.cliente_id)?.nome 
+                                  : "Selecione o cliente..."}
+                              </span>
+                              <span className="material-symbols-outlined text-xs text-[#29141B]/55">
+                                {isOpenClienteVenda ? "keyboard_arrow_up" : "keyboard_arrow_down"}
+                              </span>
+                            </button>
+
+                            {isOpenClienteVenda && (
+                              <div className="absolute left-0 right-0 mt-1 bg-white border border-[#EACAD6] rounded-xl shadow-lg z-50 max-h-60 flex flex-col overflow-hidden animate-fade-in">
+                                <div className="p-2 border-b border-[#FCEEF3] bg-[#FCFAF9] flex items-center gap-2">
+                                  <span className="material-symbols-outlined text-sm text-[#29141B]/40">search</span>
+                                  <input
+                                    type="text"
+                                    value={buscaClienteVenda}
+                                    onChange={e => setBuscaClienteVenda(e.target.value)}
+                                    placeholder="Filtrar por nome, CPF ou celular..."
+                                    className="w-full bg-transparent border-none outline-none text-xs text-[#29141B] placeholder-[#29141B]/40 h-7"
+                                    autoFocus
+                                    onClick={e => e.stopPropagation()}
+                                  />
+                                  {buscaClienteVenda && (
+                                    <button 
+                                      type="button" 
+                                      onClick={(e) => { e.stopPropagation(); setBuscaClienteVenda(""); }} 
+                                      className="text-[#29141B]/40 hover:text-[#D12D6C]"
+                                    >
+                                      <span className="material-symbols-outlined text-xs">close</span>
+                                    </button>
+                                  )}
+                                </div>
+                                <div className="overflow-y-auto flex-1 max-h-48 py-1">
+                                  {clientesFiltradosVenda.map(c => (
+                                    <button
+                                      key={c.id}
+                                      type="button"
+                                      onClick={() => {
+                                        setFormVenda({ ...formVenda, cliente_id: c.id });
+                                        setIsOpenClienteVenda(false);
+                                        setBuscaClienteVenda("");
+                                      }}
+                                      className={`w-full text-left px-3 py-2 text-xs hover:bg-[#FFEBF2]/40 hover:text-[#D12D6C] transition-all flex flex-col gap-0.5 ${
+                                        formVenda.cliente_id === c.id ? "bg-[#FFEBF2]/60 text-[#D12D6C] font-bold" : "text-[#29141B]"
+                                      }`}
+                                    >
+                                      <span className="truncate">{c.nome}</span>
+                                      {(c.cpf || c.telefone) && (
+                                        <span className="text-[9px] text-[#29141B]/55 font-mono font-normal">
+                                          {c.cpf ? `CPF: ${c.cpf}` : ""} {c.telefone ? ` • Tel: ${c.telefone}` : ""}
+                                        </span>
+                                      )}
+                                    </button>
+                                  ))}
+                                  {clientesFiltradosVenda.length === 0 && (
+                                    <div className="text-center text-[#29141B]/55 py-4 text-xs">
+                                      Nenhum cliente encontrado.
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </div>
                         </div>
 
                         <div className="flex flex-col gap-1">
@@ -4262,7 +4468,7 @@ export default function App() {
                             </tr>
                           </thead>
                           <tbody>
-                            {vendas.map(v => (
+                            {vendasPorLoja.map(v => (
                               <tr key={v.id} className="border-b border-[#FCEEF3] hover:bg-[#FFEBF2]/40 transition-colors">
                                 <td className="p-3">
                                   <div className="flex items-center gap-2">
@@ -4304,7 +4510,7 @@ export default function App() {
                                           if (error) throw error;
                                           loadAllData();
                                         } catch (err) {
-                                          alert("Erro ao atualizar vendedor: " + err.message);
+                                          triggerToast("Erro ao atualizar colaborador: " + err.message);
                                         }
                                       }}
                                       className="bg-white hover:bg-[#FCFAF9] text-[#29141B] border border-[#EACAD6] rounded-xl px-2 py-1 text-xs focus:ring-1 focus:ring-[#D12D6C] focus:border-[#D12D6C] outline-none cursor-pointer max-w-[150px] shadow-sm transition-all"
@@ -4344,7 +4550,7 @@ export default function App() {
                                 </td>
                               </tr>
                             ))}
-                            {vendas.length === 0 && (
+                            {vendasPorLoja.length === 0 && (
                               <tr>
                                 <td colSpan={5} className="text-center text-[#29141B]/60 py-12 font-medium bg-white">
                                   Nenhuma saída registrada ainda.
@@ -4357,7 +4563,7 @@ export default function App() {
 
                       {/* Visualização em Cards (Mobile) */}
                       <div className="block md:hidden flex flex-col gap-3">
-                        {vendas.map(v => (
+                        {vendasPorLoja.map(v => (
                           <div key={v.id} className="bg-white border border-[#EACAD6]/40 rounded-2xl p-4 flex flex-col gap-3 shadow-sm hover:bg-[#FCFAF9]/50 transition-colors">
                             <div className="flex items-start justify-between gap-2">
                               <div className="flex items-center gap-2">
@@ -4428,7 +4634,7 @@ export default function App() {
                                       if (error) throw error;
                                       loadAllData();
                                     } catch (err) {
-                                      alert("Erro ao atualizar vendedor: " + err.message);
+                                      triggerToast("Erro ao atualizar colaborador: " + err.message);
                                     }
                                   }}
                                   className="w-full bg-white hover:bg-[#FCFAF9] text-[#29141B] border border-[#EACAD6] rounded-xl px-3 py-1.5 text-xs focus:ring-1 focus:ring-[#D12D6C] focus:border-[#D12D6C] outline-none cursor-pointer shadow-sm transition-all"
@@ -4447,7 +4653,7 @@ export default function App() {
                             </div>
                           </div>
                         ))}
-                        {vendas.length === 0 && (
+                        {vendasPorLoja.length === 0 && (
                           <div className="text-center text-[#29141B]/60 py-8 font-medium bg-white border border-[#EACAD6]/45 rounded-2xl shadow-sm">
                             Nenhuma saída registrada ainda.
                           </div>
@@ -4635,8 +4841,8 @@ export default function App() {
                                   onClick={async () => {
                                     if (confirm(`Deseja realmente excluir o cliente ${c.nome}?`)) {
                                       const { error } = await supabase.from("clientes").delete().eq("id", c.id);
-                                      if (error) alert("Erro ao excluir: " + error.message);
-                                      else { alert("Cliente excluído com sucesso!"); loadAllData(); }
+                                      if (error) triggerToast("Erro ao excluir: " + error.message);
+                                      else { triggerToast("Cliente excluído com sucesso."); loadAllData(); }
                                     }
                                   }}
                                   className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-600 border border-rose-200 text-rose-600 hover:text-white transition-all flex items-center justify-center shadow-xs"
@@ -4676,31 +4882,88 @@ export default function App() {
                       <form onSubmit={handleSaveTroca} className="flex flex-col gap-4">
                         <div className="flex flex-col gap-1">
                           <label className="text-[10px] font-bold text-[#29141B]/85 uppercase tracking-wider">Cliente</label>
-                          <select 
-                            required 
-                            value={formTroca.cliente_id} 
-                            onChange={e => {
-                              setFormTroca({ 
-                                ...formTroca, 
-                                cliente_id: e.target.value,
-                                venda_id: "",
-                                bolsa_devolvida_id: "",
-                                bolsa_nova_id: ""
-                              });
-                              setShowClientPossessions(false);
-                            }}
-                            className="h-11 w-full rounded-xl border border-[#EACAD6] bg-white px-3 text-[#29141B] placeholder-[#29141B]/55 focus:border-[#D12D6C] focus:ring-1 focus:ring-[#D12D6C] focus:outline-none transition-all shadow-sm text-sm cursor-pointer"
-                          >
-                            <option value="" disabled hidden>Selecione o cliente...</option>
-                            {clientes.map(c => (
-                              <option key={c.id} value={c.id}>{c.nome}</option>
-                            ))}
-                          </select>
+                          <div className="relative">
+                            <button
+                              type="button"
+                              onClick={() => setIsOpenClienteTroca(!isOpenClienteTroca)}
+                              className="h-11 w-full rounded-xl border border-[#EACAD6] bg-white px-3 text-left text-[#29141B] focus:border-[#D12D6C] focus:ring-1 focus:ring-[#D12D6C] focus:outline-none transition-all shadow-sm text-sm flex items-center justify-between cursor-pointer"
+                            >
+                              <span className="truncate">
+                                {formTroca.cliente_id 
+                                  ? clientes.find(c => c.id === formTroca.cliente_id)?.nome 
+                                  : "Selecione o cliente..."}
+                              </span>
+                              <span className="material-symbols-outlined text-xs text-[#29141B]/55">
+                                {isOpenClienteTroca ? "keyboard_arrow_up" : "keyboard_arrow_down"}
+                              </span>
+                            </button>
+
+                            {isOpenClienteTroca && (
+                              <div className="absolute left-0 right-0 mt-1 bg-white border border-[#EACAD6] rounded-xl shadow-lg z-50 max-h-60 flex flex-col overflow-hidden animate-fade-in">
+                                <div className="p-2 border-b border-[#FCEEF3] bg-[#FCFAF9] flex items-center gap-2">
+                                  <span className="material-symbols-outlined text-sm text-[#29141B]/40">search</span>
+                                  <input
+                                    type="text"
+                                    value={buscaClienteTroca}
+                                    onChange={e => setBuscaClienteTroca(e.target.value)}
+                                    placeholder="Filtrar por nome, CPF ou celular..."
+                                    className="w-full bg-transparent border-none outline-none text-xs text-[#29141B] placeholder-[#29141B]/40 h-7"
+                                    autoFocus
+                                    onClick={e => e.stopPropagation()}
+                                  />
+                                  {buscaClienteTroca && (
+                                    <button 
+                                      type="button" 
+                                      onClick={(e) => { e.stopPropagation(); setBuscaClienteTroca(""); }} 
+                                      className="text-[#29141B]/40 hover:text-[#D12D6C]"
+                                    >
+                                      <span className="material-symbols-outlined text-xs">close</span>
+                                    </button>
+                                  )}
+                                </div>
+                                <div className="overflow-y-auto flex-1 max-h-48 py-1">
+                                  {clientesFiltradosTroca.map(c => (
+                                    <button
+                                      key={c.id}
+                                      type="button"
+                                      onClick={() => {
+                                        setFormTroca({ 
+                                          ...formTroca, 
+                                          cliente_id: c.id,
+                                          venda_id: "",
+                                          bolsa_devolvida_id: "",
+                                          bolsa_nova_id: ""
+                                        });
+                                        setShowClientPossessions(false);
+                                        setIsOpenClienteTroca(false);
+                                        setBuscaClienteTroca("");
+                                      }}
+                                      className={`w-full text-left px-3 py-2 text-xs hover:bg-[#FFEBF2]/40 hover:text-[#D12D6C] transition-all flex flex-col gap-0.5 ${
+                                        formTroca.cliente_id === c.id ? "bg-[#FFEBF2]/60 text-[#D12D6C] font-bold" : "text-[#29141B]"
+                                      }`}
+                                    >
+                                      <span className="truncate">{c.nome}</span>
+                                      {(c.cpf || c.telefone) && (
+                                        <span className="text-[9px] text-[#29141B]/55 font-mono font-normal">
+                                          {c.cpf ? `CPF: ${c.cpf}` : ""} {c.telefone ? ` • Tel: ${c.telefone}` : ""}
+                                        </span>
+                                      )}
+                                    </button>
+                                  ))}
+                                  {clientesFiltradosTroca.length === 0 && (
+                                    <div className="text-center text-[#29141B]/55 py-4 text-xs">
+                                      Nenhum cliente encontrado.
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </div>
                         </div>
 
                         {/* Itens em posse do cliente selecionado (Gaveta colapsável) */}
                         {formTroca.cliente_id && (() => {
-                          const clientActiveSales = vendas.filter(v => v.cliente_id === formTroca.cliente_id && !v.devolvida);
+                          const clientActiveSales = vendasPorLoja.filter(v => v.cliente_id === formTroca.cliente_id && !v.devolvida);
                           if (clientActiveSales.length === 0) return null;
                           return (
                             <div className="flex flex-col mt-1 bg-white border border-[#EACAD6]/60 rounded-xl overflow-hidden shadow-xs transition-all duration-350">
@@ -5069,7 +5332,7 @@ export default function App() {
                             </tr>
                           </thead>
                           <tbody>
-                            {trocas.map(t => (
+                            {trocasPorLoja.map(t => (
                               <tr 
                                 key={t.id} 
                                 id={`troca-row-${t.id}`}
@@ -5109,7 +5372,7 @@ export default function App() {
                                 </td>
                               </tr>
                             ))}
-                            {trocas.length === 0 && (
+                            {trocasPorLoja.length === 0 && (
                               <tr>
                                 <td colSpan={5} className="text-center text-[#29141B]/60 py-12 font-medium bg-white">
                                   Nenhuma troca efetuada até o momento.
@@ -5122,7 +5385,7 @@ export default function App() {
 
                       {/* Visualização em Cards (Mobile) */}
                       <div className="block md:hidden flex flex-col gap-3">
-                        {trocas.map(t => (
+                        {trocasPorLoja.map(t => (
                           <div 
                             key={t.id} 
                             id={`troca-card-${t.id}`}
@@ -5176,7 +5439,7 @@ export default function App() {
                             </div>
                           </div>
                         ))}
-                        {trocas.length === 0 && (
+                        {trocasPorLoja.length === 0 && (
                           <div className="text-center text-[#29141B]/60 py-8 font-medium bg-white border border-[#FCEEF3] rounded-2xl shadow-sm">
                             Nenhuma troca efetuada até o momento.
                           </div>
@@ -5508,10 +5771,10 @@ export default function App() {
                             <span className="text-[10px] uppercase font-extrabold tracking-wider text-[#29141B]/60">Total em Estoque</span>
                           </div>
                           <span className="text-2xl font-extrabold text-[#29141B] mt-1">
-                            {bolsas.reduce((acc, b) => acc + (b.quantidade > 0 ? b.quantidade : 0), 0)} un
+                            {bolsasPorLoja.reduce((acc, b) => acc + (b.quantidade > 0 ? b.quantidade : 0), 0)} un
                           </span>
                           <span className="text-[10px] text-[#29141B]/50 font-semibold">
-                            {bolsas.length} modelo{bolsas.length !== 1 ? 's' : ''} cadastrado{bolsas.length !== 1 ? 's' : ''}
+                            {bolsasPorLoja.length} modelo{bolsasPorLoja.length !== 1 ? 's' : ''} cadastrado{bolsasPorLoja.length !== 1 ? 's' : ''}
                           </span>
                         </div>
 
@@ -5521,7 +5784,7 @@ export default function App() {
                             <span className="text-[10px] uppercase font-extrabold tracking-wider text-[#29141B]/60">Valor Estimado</span>
                           </div>
                           <span className="text-2xl font-extrabold text-emerald-600 mt-1">
-                            {bolsas.reduce((acc, b) => acc + (b.quantidade * Number(b.preco_venda)), 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                            {bolsasPorLoja.reduce((acc, b) => acc + (b.quantidade * Number(b.preco_venda)), 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
                           </span>
                           <span className="text-[10px] text-[#29141B]/50 font-semibold">
                             Soma do preço de venda de todas as unidades
@@ -5923,6 +6186,17 @@ export default function App() {
 
                             if (profileError) throw profileError;
 
+                            // 2. Atualizar relacionamentos com lojas
+                            await supabase.from("funcionario_lojas").delete().eq("funcionario_id", editingFuncionario.id);
+                            if (formFuncionario.lojas && formFuncionario.lojas.length > 0) {
+                              const flInserts = formFuncionario.lojas.map(lid => ({
+                                funcionario_id: editingFuncionario.id,
+                                loja_id: lid
+                              }));
+                              const { error: flErr } = await supabase.from("funcionario_lojas").insert(flInserts);
+                              if (flErr) throw flErr;
+                            }
+
                             // 2. Se digitou senha, atualiza no auth.users via RPC
                             if (formFuncionario.password) {
                               const { error: rpcError } = await supabase.rpc("change_user_password", {
@@ -5932,22 +6206,22 @@ export default function App() {
                               if (rpcError) throw rpcError;
                             }
 
-                            alert("Cadastro do funcionário atualizado com sucesso!");
+                            triggerToast("Cadastro do colaborador atualizado com sucesso.");
                             setEditingFuncionario(null);
-                            setFormFuncionario({ email: "", password: "", nome: "", role: "funcionario", telefone: "" });
+                            setFormFuncionario({ email: "", password: "", nome: "", role: "funcionario", telefone: "", lojas: [] });
                             setShowPassword(false);
                             loadAllData();
                           } catch (err) {
-                            alert("Erro ao atualizar funcionário: " + err.message);
+                            triggerToast("Erro ao atualizar colaborador: " + err.message);
                           }
                         } else {
                           // MODO CADASTRO ORIGINAL
                           if (!formFuncionario.nome || !formFuncionario.email || !formFuncionario.password) {
-                            alert("Preencha todos os campos obrigatórios (Nome, E-mail e Senha)!");
+                            triggerToast("Preencha todos os campos obrigatórios: nome, e-mail e senha.");
                             return;
                           }
                           if (formFuncionario.password.length < 6) {
-                            alert("A senha do funcionário deve ter no mínimo 6 caracteres!");
+                            triggerToast("A senha do colaborador deve ter no mínimo 6 caracteres.");
                             return;
                           }
                           try {
@@ -5971,12 +6245,23 @@ export default function App() {
 
                             if (signUpError) throw signUpError;
 
-                            alert("Funcionário cadastrado com sucesso! Ele já pode fazer login direto com o e-mail e a senha cadastrados.");
-                            setFormFuncionario({ email: "", password: "", nome: "", role: "funcionario", telefone: "" });
+                            // Inserir associações de loja
+                            const newFid = authData.user?.id;
+                            if (newFid && formFuncionario.lojas && formFuncionario.lojas.length > 0) {
+                              const flInserts = formFuncionario.lojas.map(lid => ({
+                                funcionario_id: newFid,
+                                loja_id: lid
+                              }));
+                              const { error: flErr } = await supabase.from("funcionario_lojas").insert(flInserts);
+                              if (flErr) throw flErr;
+                            }
+
+                            triggerToast("Colaborador cadastrado com sucesso! Login liberado com o e-mail e senha.");
+                            setFormFuncionario({ email: "", password: "", nome: "", role: "funcionario", telefone: "", lojas: [] });
                             setShowPassword(false);
                             loadAllData();
                           } catch (err) {
-                            alert("Erro ao cadastrar funcionário: " + err.message);
+                            triggerToast("Erro ao cadastrar colaborador: " + err.message);
                           }
                         }
                       }} className="flex flex-col gap-4">
@@ -6068,13 +6353,42 @@ export default function App() {
                           </div>
                         </div>
 
+                        {/* Lojas Associadas */}
+                        <div className="flex flex-col gap-1.5 border-t border-[#FCEEF3] pt-4 mt-1">
+                          <label className="text-[10px] font-extrabold tracking-wider uppercase text-[#29141B]/60 px-0.5 select-none">
+                            Lojas Associadas
+                          </label>
+                          <div className="grid grid-cols-2 gap-2 mt-1 max-h-32 overflow-y-auto pr-1">
+                            {lojas.map(l => {
+                              const isChecked = formFuncionario.lojas?.includes(l.id) || false;
+                              return (
+                                <label key={l.id} className="flex items-center gap-2 bg-[#FCFAF9] hover:bg-[#FFEBF2]/20 border border-[#EACAD6]/50 rounded-xl px-3 py-2 cursor-pointer transition-all select-none">
+                                  <input
+                                    type="checkbox"
+                                    checked={isChecked}
+                                    onChange={(e) => {
+                                      const currentLojas = formFuncionario.lojas || [];
+                                      const updatedLojas = e.target.checked
+                                        ? [...currentLojas, l.id]
+                                        : currentLojas.filter(id => id !== l.id);
+                                      setFormFuncionario({ ...formFuncionario, lojas: updatedLojas });
+                                    }}
+                                    className="w-4 h-4 rounded text-[#D12D6C] focus:ring-[#D12D6C] accent-[#D12D6C] cursor-pointer"
+                                  />
+                                  <span className="text-xs font-semibold text-[#29141B]/80 truncate">{l.nome}</span>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </div>
+
                         <div className="flex flex-col sm:flex-row gap-3 mt-4">
                           {editingFuncionario && (
                             <button 
                               type="button" 
                               onClick={() => {
                                 setEditingFuncionario(null);
-                                setFormFuncionario({ email: "", password: "", nome: "", role: "funcionario", telefone: "" });
+                                setFormFuncionario({ email: "", password: "", nome: "", role: "funcionario", telefone: "", lojas: [] });
                                 setShowPassword(false);
                               }}
                               className="py-3 px-5 min-h-[48px] bg-[#FCFAF9] hover:bg-[#FFEBF2]/10 text-[#29141B] hover:text-[#D12D6C] rounded-2xl font-bold text-xs tracking-wide flex items-center justify-center gap-2 border-2 border-[#EACAD6] hover:border-[#D12D6C]/30 transition-all duration-200 cursor-pointer sm:w-1/3 w-full"
@@ -6152,7 +6466,8 @@ export default function App() {
                                     password: "", // deixa a senha em branco na edição
                                     nome: f.nome,
                                     role: f.role,
-                                    telefone: f.telefone || ""
+                                    telefone: f.telefone || "",
+                                    lojas: funcionarioLojas.filter(fl => fl.funcionario_id === f.id).map(fl => fl.loja_id)
                                   });
                                   setShowPassword(false);
                                   document.getElementById("st-nome")?.focus();
@@ -6169,9 +6484,9 @@ export default function App() {
                                   if (confirm(`Deseja realmente deletar a conta de ${f.nome}?`)) {
                                     const { error } = await supabase.from("profiles").delete().eq("id", f.id);
                                     if (error) {
-                                      alert("Erro ao remover funcionário: " + error.message);
+                                      triggerToast("Erro ao remover colaborador: " + error.message);
                                     } else {
-                                      alert("Funcionário removido com sucesso!");
+                                      triggerToast("Colaborador removido com sucesso.");
                                       loadAllData();
                                     }
                                   }
@@ -6182,6 +6497,79 @@ export default function App() {
                                 <span className="material-symbols-outlined text-base">delete</span>
                               </button>
                             </div>
+                          </div>
+                        ))}
+                      </div>
+                    </section>
+
+                    {/* Seção de Lojas/Filiais */}
+                    <section className="bg-white rounded-[24px] border border-[#EACAD6] shadow-[0_4px_12px_rgba(41,20,27,0.05)] p-6 flex flex-col gap-4 mt-6">
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <h2 className="text-xl font-extrabold text-[#29141B]">Filiais e Lojas</h2>
+                          <p className="text-xs text-[#29141B]/60">Cadastre e gerencie as lojas da rede.</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setIsAddingStore(true)}
+                          className="bg-[#FFEBF2] text-[#D12D6C] px-3.5 py-1.5 rounded-xl border border-[#FAD6E5] text-xs font-extrabold flex items-center gap-1 hover:bg-[#D12D6C] hover:text-white transition-all duration-300 shadow-2xs cursor-pointer"
+                        >
+                          <span className="material-symbols-outlined text-sm">add</span>
+                          Nova Loja
+                        </button>
+                      </div>
+
+                      <div className="grid gap-3">
+                        {lojas.map(l => (
+                          <div 
+                            key={l.id} 
+                            className="bg-[#FCFAF9] border border-[#FCEEF3] rounded-2xl p-4 flex items-center justify-between shadow-sm hover:bg-[#FFEBF2]/10 transition-colors"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-full bg-[#FCFAF9] text-[#D12D6C] border border-[#EACAD6] flex items-center justify-center font-bold">
+                                <span className="material-symbols-outlined text-lg">storefront</span>
+                              </div>
+                              <div>
+                                <strong className="text-[#29141B] text-base block font-bold">{l.nome}</strong>
+                                <span className="block text-xs text-[#29141B]/60">
+                                  {l.endereco || "Sem endereço cadastrado"} {l.telefone ? `• Tel: ${l.telefone}` : ""}
+                                </span>
+                              </div>
+                            </div>
+
+                            {profile?.role === "admin" && (
+                              <div className="flex items-center gap-1.5">
+                                <button 
+                                  onClick={() => {
+                                    setFormLoja({ nome: l.nome, endereco: l.endereco || "", telefone: l.telefone || "" });
+                                    setEditingStore(l);
+                                  }}
+                                  className="p-1.5 rounded-lg bg-blue-50 hover:bg-blue-600 border border-blue-200 text-blue-600 hover:text-white transition-all flex items-center justify-center shadow-xs cursor-pointer"
+                                  title="Editar Loja"
+                                >
+                                  <span className="material-symbols-outlined text-base">edit</span>
+                                </button>
+                                {l.nome !== "Loja Matriz" && (
+                                  <button 
+                                    onClick={async () => {
+                                      if (confirm(`Deseja realmente excluir a loja "${l.nome}"? Os produtos e vendas vinculados a ela ficarão sem loja associada (nulos).`)) {
+                                        const { error } = await supabase.from("lojas").delete().eq("id", l.id);
+                                        if (error) {
+                                          triggerToast("Erro ao excluir loja: " + error.message);
+                                        } else {
+                                          triggerToast("Loja excluída com sucesso.");
+                                          loadAllData();
+                                        }
+                                      }
+                                    }}
+                                    className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-600 border border-rose-200 text-rose-600 hover:text-white transition-all flex items-center justify-center shadow-xs cursor-pointer"
+                                    title="Excluir Loja"
+                                  >
+                                    <span className="material-symbols-outlined text-base">delete</span>
+                                  </button>
+                                )}
+                              </div>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -6350,6 +6738,36 @@ export default function App() {
                     </div>
                   </div>
 
+                  {/* Estoque em Outras Lojas (Cross-Query) */}
+                  <div className="mb-6 border-t border-outline-variant/60 pt-3">
+                    <span className="text-[9px] uppercase tracking-wider text-on-surface-variant font-bold block mb-1.5">
+                      Disponibilidade em Outras Lojas
+                    </span>
+                    <div className="flex flex-col gap-1.5 max-h-24 overflow-y-auto pr-1">
+                      {lojas.filter(l => l.id !== selectedBolsaForView.loja_id).length === 0 ? (
+                        <span className="text-xs text-[#29141B]/50 font-semibold italic">Nenhuma outra loja cadastrada</span>
+                      ) : (
+                        lojas
+                          .filter(l => l.id !== selectedBolsaForView.loja_id)
+                          .map(l => {
+                            const itemsNoEstoque = bolsas.filter(b => 
+                              b.loja_id === l.id && 
+                              b.nome.toLowerCase().trim() === selectedBolsaForView.nome.toLowerCase().trim()
+                            );
+                            const totalQtd = itemsNoEstoque.reduce((sum, b) => sum + b.quantidade, 0);
+                            return (
+                              <div key={l.id} className="flex justify-between items-center bg-[#FCFAF9] rounded-lg px-3 py-1.5 border border-[#FCEEF3]">
+                                <span className="text-xs font-semibold text-[#29141B]/80">{l.nome}</span>
+                                <span className={`text-xs font-extrabold px-2 py-0.5 rounded-full ${totalQtd > 0 ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-500"}`}>
+                                  {totalQtd} un
+                                </span>
+                              </div>
+                            );
+                          })
+                      )}
+                    </div>
+                  </div>
+
                   {/* Prices */}
                   <div className="flex items-center gap-4 mb-6 border-t border-b border-outline-variant/60 py-3">
                     <div className="flex-1">
@@ -6414,6 +6832,126 @@ export default function App() {
                   )}
                 </div>
               </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ── REGISTER NEW STORE MODAL (Admin Only) ── */}
+      <AnimatePresence>
+        {(isAddingStore || editingStore) && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => { setIsAddingStore(false); setEditingStore(null); setFormLoja({ nome: "", endereco: "", telefone: "" }); }}
+              className="absolute inset-0 bg-[#0c0c16]/80 backdrop-blur-md"
+            />
+
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0, y: 15 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 15 }}
+              className="bg-white border border-[#EACAD6] w-full max-w-md rounded-3xl p-6 shadow-2xl relative z-10 flex flex-col gap-5"
+            >
+              <div className="flex justify-between items-center border-b border-[#FCEEF3] pb-3">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[#D12D6C] text-xl">storefront</span>
+                  <h3 className="text-lg font-extrabold text-[#29141B]">
+                    {editingStore ? "Editar Loja" : "Cadastrar Nova Loja"}
+                  </h3>
+                </div>
+                <button 
+                  onClick={() => { setIsAddingStore(false); setEditingStore(null); setFormLoja({ nome: "", endereco: "", telefone: "" }); }}
+                  className="text-[#29141B]/60 hover:text-[#D12D6C] transition-colors"
+                >
+                  <span className="material-symbols-outlined">close</span>
+                </button>
+              </div>
+
+              <form onSubmit={async (e) => {
+                e.preventDefault();
+                if (!formLoja.nome) {
+                  triggerToast("O nome da loja é obrigatório.");
+                  return;
+                }
+                try {
+                  if (editingStore) {
+                    const { error } = await supabase
+                      .from("lojas")
+                      .update({
+                        nome: formLoja.nome,
+                        endereco: formLoja.endereco || null,
+                        telefone: formLoja.telefone || null
+                      })
+                      .eq("id", editingStore.id);
+
+                    if (error) throw error;
+                    triggerToast("Loja atualizada com sucesso.");
+                  } else {
+                    const { error } = await supabase
+                      .from("lojas")
+                      .insert({
+                        nome: formLoja.nome,
+                        endereco: formLoja.endereco || null,
+                        telefone: formLoja.telefone || null
+                      });
+
+                    if (error) throw error;
+                    triggerToast("Loja cadastrada com sucesso.");
+                  }
+
+                  setFormLoja({ nome: "", endereco: "", telefone: "" });
+                  setIsAddingStore(false);
+                  setEditingStore(null);
+                  loadAllData();
+                } catch (err) {
+                  triggerToast("Erro ao salvar loja: " + err.message);
+                }
+              }} className="flex flex-col gap-4">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-extrabold tracking-wider uppercase text-[#29141B]/60">Nome da Loja *</label>
+                  <input 
+                    type="text" 
+                    required 
+                    value={formLoja.nome} 
+                    onChange={e => setFormLoja({ ...formLoja, nome: e.target.value })} 
+                    placeholder="e.g. Zero Um - Copacabana" 
+                    className="h-11 w-full rounded-xl border-2 border-[#EACAD6] bg-[#FCFAF9] px-3.5 text-[#29141B] text-xs font-bold outline-none focus:border-[#D12D6C] focus:bg-white"
+                  />
+                </div>
+                
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-extrabold tracking-wider uppercase text-[#29141B]/60">Endereço</label>
+                  <input 
+                    type="text" 
+                    value={formLoja.endereco} 
+                    onChange={e => setFormLoja({ ...formLoja, endereco: e.target.value })} 
+                    placeholder="Av. Atlântica, 1000 - Rio de Janeiro" 
+                    className="h-11 w-full rounded-xl border-2 border-[#EACAD6] bg-[#FCFAF9] px-3.5 text-[#29141B] text-xs font-bold outline-none focus:border-[#D12D6C] focus:bg-white"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-extrabold tracking-wider uppercase text-[#29141B]/60">Telefone</label>
+                  <input 
+                    type="text" 
+                    value={formLoja.telefone} 
+                    onChange={e => setFormLoja({ ...formLoja, telefone: e.target.value })} 
+                    placeholder="(21) 2222-3333" 
+                    className="h-11 w-full rounded-xl border-2 border-[#EACAD6] bg-[#FCFAF9] px-3.5 text-[#29141B] text-xs font-bold outline-none focus:border-[#D12D6C] focus:bg-white"
+                  />
+                </div>
+
+                <button 
+                  type="submit"
+                  className="mt-2 w-full bg-gradient-to-r from-[#D12D6C] to-[#FC5897] text-white h-12 rounded-xl font-extrabold text-xs uppercase tracking-widest flex items-center justify-center gap-2 shadow-md hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 active:scale-95 transition-all"
+                >
+                  {editingStore ? "Salvar Alterações" : "Confirmar Cadastro"}
+                  <span className="material-symbols-outlined text-sm font-bold">check</span>
+                </button>
+              </form>
             </motion.div>
           </div>
         )}
