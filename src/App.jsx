@@ -29,6 +29,13 @@ export default function App() {
   const [session, setSession] = useState(null);
   const [profile, setProfile] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
+
+  // Saídas History Filters & Pagination
+  const [saidasSearch, setSaidasSearch] = useState("");
+  const [saidasDateFilter, setSaidasDateFilter] = useState("all");
+  const [saidasVendedorFilter, setSaidasVendedorFilter] = useState("all");
+  const [saidasPagamentoFilter, setSaidasPagamentoFilter] = useState("all");
+  const [saidasLimit, setSaidasLimit] = useState(10);
   const [isSignUp, setIsSignUp] = useState(false);
   const [hasNoUsers, setHasNoUsers] = useState(false);
 
@@ -1475,6 +1482,76 @@ export default function App() {
 
     return grupos.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   }, [vendasPorLoja]);
+
+  const vendasFiltradas = useMemo(() => {
+    let result = vendasAgrupadasPorLoja;
+
+    // 1. Search Query
+    if (saidasSearch.trim()) {
+      const query = saidasSearch.toLowerCase();
+      result = result.filter(v => {
+        const matchItem = v.itens.some(item => 
+          item.nome.toLowerCase().includes(query) || 
+          (item.codigo && item.codigo.toLowerCase().includes(query))
+        );
+        const matchCliente = v.clientes?.nome?.toLowerCase().includes(query);
+        const matchObs = v.observacao?.toLowerCase().includes(query);
+        return matchItem || matchCliente || matchObs;
+      });
+    }
+
+    // 2. Date Filter
+    if (saidasDateFilter !== "all") {
+      const hoje = new Date();
+      hoje.setHours(0, 0, 0, 0);
+      const hojeTime = hoje.getTime();
+
+      const ontem = new Date();
+      ontem.setDate(ontem.getDate() - 1);
+      ontem.setHours(0, 0, 0, 0);
+      const ontemTime = ontem.getTime();
+
+      const seteDias = new Date();
+      seteDias.setDate(seteDias.getDate() - 7);
+      seteDias.setHours(0, 0, 0, 0);
+      const seteDiasTime = seteDias.getTime();
+
+      const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+      const inicioMesTime = inicioMes.getTime();
+
+      result = result.filter(v => {
+        if (!v.created_at) return false;
+        const dTime = new Date(v.created_at).getTime();
+
+        if (saidasDateFilter === "today") {
+          return dTime >= hojeTime;
+        } else if (saidasDateFilter === "yesterday") {
+          return dTime >= ontemTime && dTime < hojeTime;
+        } else if (saidasDateFilter === "7days") {
+          return dTime >= seteDiasTime;
+        } else if (saidasDateFilter === "month") {
+          return dTime >= inicioMesTime;
+        }
+        return true;
+      });
+    }
+
+    // 3. Vendedor Filter
+    if (saidasVendedorFilter !== "all") {
+      result = result.filter(v => v.funcionario_id === saidasVendedorFilter);
+    }
+
+    // 4. Pagamento Filter
+    if (saidasPagamentoFilter !== "all") {
+      result = result.filter(v => v.forma_pagamento === saidasPagamentoFilter);
+    }
+
+    return result;
+  }, [vendasAgrupadasPorLoja, saidasSearch, saidasDateFilter, saidasVendedorFilter, saidasPagamentoFilter]);
+
+  const vendasExibidas = useMemo(() => {
+    return vendasFiltradas.slice(0, saidasLimit);
+  }, [vendasFiltradas, saidasLimit]);
 
   const trocasPorLoja = useMemo(() => {
     if (!activeStore) return trocas;
@@ -4531,222 +4608,342 @@ export default function App() {
 
                   {/* Right Column: History of sales */}
                   <div className="lg:col-span-2 flex flex-col gap-6">
-                    <section className="bg-white rounded-[24px] border border-[#FCEEF3] shadow-sm p-6 flex flex-col gap-4">
-                      <div>
-                        <h2 className="text-xl font-extrabold text-[#29141B]">Histórico de Saídas</h2>
+                    <section className="bg-white rounded-[24px] border border-[#FCEEF3] shadow-sm p-6 flex flex-col gap-5">
+                      
+                      {/* Header with Title and Search/Filters Toggle */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#FCEEF3] pb-4 select-none">
+                        <div>
+                          <h2 className="text-xl font-extrabold text-[#29141B] flex items-center gap-2">
+                            <span className="material-symbols-outlined text-[#D12D6C] text-2xl">history</span>
+                            Histórico de Saídas
+                          </h2>
+                          <p className="text-[10px] text-[#29141B]/55 font-medium mt-0.5">
+                            Visualização consolidada de todas as vendas e saídas de estoque.
+                          </p>
+                        </div>
+                        
+                        {/* Compact Search Bar */}
+                        <div className="relative w-full sm:w-64">
+                          <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-sm text-[#29141B]/40">search</span>
+                          <input 
+                            type="text"
+                            value={saidasSearch}
+                            onChange={e => {
+                              setSaidasSearch(e.target.value);
+                              setSaidasLimit(10); // Reset limit on search
+                            }}
+                            placeholder="Buscar por cliente, produto, obs..."
+                            className="h-9 w-full rounded-xl border border-[#EACAD6] bg-white pl-9 pr-3 text-[#29141B] placeholder-[#29141B]/35 focus:border-[#D12D6C] focus:ring-1 focus:ring-[#D12D6C] focus:outline-none transition-all shadow-xs text-xs"
+                          />
+                        </div>
                       </div>
 
-                      {/* Visualização em Tabela (Desktop & Tablet) */}
-                      <div className="hidden md:block overflow-x-auto border border-[#FCEEF3] rounded-2xl shadow-sm">
-                        <table className="w-full text-sm border-collapse text-left bg-white">
-                          <thead>
-                            <tr className="bg-[#FCFAF9] border-b border-[#FCEEF3] text-[10px] font-bold uppercase tracking-widest text-[#29141B]/60">
-                              <th className="p-3">Produto</th>
-                              <th className="p-3">Cliente</th>
-                              <th className="p-3">Vendedor</th>
-                              <th className="p-3">Valor Pago</th>
-                              <th className="p-3">Data</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {vendasAgrupadasPorLoja.map(v => (
-                              <tr key={v.id} className="border-b border-[#FCEEF3] hover:bg-[#FFEBF2]/40 transition-colors">
-                                <td className="p-3">
-                                  <div className="flex flex-col gap-2.5">
-                                    {v.itens.map((item, idx) => (
-                                      <div key={idx} className="flex items-center gap-2">
-                                        <div>
-                                          <span className="block font-bold text-[#29141B]">
-                                            {item.nome} {item.qty > 1 ? `(x${item.qty})` : ""}
-                                          </span>
-                                          <span className="block text-[10px] text-[#29141B]/60">Cód: {item.codigo || "N/A"}</span>
-                                        </div>
-                                        {v.observacao && v.observacao.includes("[Trocada/Devolvida") && idx === 0 && (
-                                          <span 
-                                            className="text-[8px] bg-rose-50 border border-rose-200 text-rose-600 font-extrabold uppercase px-1.5 py-0.5 rounded shrink-0 cursor-pointer hover:bg-rose-100 hover:border-rose-300 transition-all shadow-sm active:scale-95 flex items-center gap-0.5" 
-                                            title="Clique para rastrear esta troca no histórico"
-                                            onClick={() => handleRastrearTroca(item.bolsa_id, v.cliente_id)}
-                                          >
-                                            <span className="material-symbols-outlined text-[10px]">sync_alt</span>
-                                            Devolvida
-                                          </span>
+                      {/* Premium Filter Tabs (Pills) */}
+                      <div className="flex flex-wrap items-center gap-2 border-b border-[#FCEEF3] pb-4">
+                        <span className="text-[9px] font-bold text-[#29141B]/40 uppercase tracking-widest mr-1 select-none">Período:</span>
+                        {[
+                          { id: "all", label: "Tudo" },
+                          { id: "today", label: "Hoje" },
+                          { id: "yesterday", label: "Ontem" },
+                          { id: "7days", label: "7 Dias" },
+                          { id: "month", label: "Este Mês" }
+                        ].map(pill => (
+                          <button
+                            key={pill.id}
+                            type="button"
+                            onClick={() => {
+                              setSaidasDateFilter(pill.id);
+                              setSaidasLimit(10); // Reset limit
+                            }}
+                            className={`px-3 py-1 rounded-full text-xs font-bold transition-all duration-200 cursor-pointer ${
+                              saidasDateFilter === pill.id 
+                                ? "bg-[#C9A84C]/15 border border-[#C9A84C] text-[#a3832d] shadow-xs scale-102"
+                                : "bg-[#FCFAF9] hover:bg-[#FFEBF2]/40 border border-[#EACAD6]/45 text-[#29141B]/75"
+                            }`}
+                          >
+                            {pill.label}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Dropdown Filters (Vendedor, Pagamento) */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-[#FCFAF9] border border-[#FCEEF3] rounded-2xl p-3.5 select-none">
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[9px] font-black text-[#29141B]/55 uppercase tracking-wider">Filtrar por Vendedor</label>
+                          <select
+                            value={saidasVendedorFilter}
+                            onChange={e => {
+                              setSaidasVendedorFilter(e.target.value);
+                              setSaidasLimit(10);
+                            }}
+                            className="h-8 rounded-xl border border-[#EACAD6] bg-white px-2.5 text-xs text-[#29141B] placeholder-[#29141B]/55 focus:border-[#D12D6C] focus:ring-1 focus:ring-[#D12D6C] focus:outline-none transition-all shadow-xs cursor-pointer"
+                          >
+                            <option value="all">Todos os vendedores</option>
+                            {funcionarios.map(f => (
+                              <option key={f.id} value={f.id}>{f.nome}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[9px] font-black text-[#29141B]/55 uppercase tracking-wider">Forma de Pagamento</label>
+                          <select
+                            value={saidasPagamentoFilter}
+                            onChange={e => {
+                              setSaidasPagamentoFilter(e.target.value);
+                              setSaidasLimit(10);
+                            }}
+                            className="h-8 rounded-xl border border-[#EACAD6] bg-white px-2.5 text-xs text-[#29141B] placeholder-[#29141B]/55 focus:border-[#D12D6C] focus:ring-1 focus:ring-[#D12D6C] focus:outline-none transition-all shadow-xs cursor-pointer"
+                          >
+                            <option value="all">Todas as formas</option>
+                            <option value="pix">📱 Pix</option>
+                            <option value="dinheiro">💵 Dinheiro</option>
+                            <option value="debito">💳 Débito</option>
+                            <option value="credito">💳 Crédito</option>
+                            <option value="boleto">📄 Boleto</option>
+                            <option value="troca">🔄 Troca</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Display of Grouped Timeline */}
+                      {(() => {
+                        let lastDateHeader = "";
+                        return (
+                          <div className="flex flex-col gap-4">
+                            {vendasExibidas.map(v => {
+                              const itemDate = new Date(v.created_at);
+                              const dateHeader = itemDate.toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+                              const isNewDay = dateHeader !== lastDateHeader;
+                              if (isNewDay) {
+                                lastDateHeader = dateHeader;
+                              }
+                              
+                              return (
+                                <React.Fragment key={v.id}>
+                                  {isNewDay && (
+                                    <div className="flex items-center gap-3 my-2 select-none col-span-full">
+                                      <div className="h-[1px] bg-[#EACAD6]/45 flex-1"></div>
+                                      <span className="text-[9px] font-black uppercase tracking-widest text-[#a3832d] bg-[#C9A84C]/10 border border-[#C9A84C]/25 px-3 py-1 rounded-full shadow-xs flex items-center gap-1.5 select-none">
+                                        <span className="material-symbols-outlined text-[12px]">calendar_today</span>
+                                        {dateHeader.charAt(0).toUpperCase() + dateHeader.slice(1)}
+                                      </span>
+                                      <div className="h-[1px] bg-[#EACAD6]/45 flex-1"></div>
+                                    </div>
+                                  )}
+                                  
+                                  {/* Premium Transaction Bar (Combined for Desktop & Mobile) */}
+                                  <div className="bg-white border border-[#EACAD6]/35 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs hover:shadow-[0_4px_16px_rgba(201,168,76,0.06)] hover:border-[#C9A84C]/35 transition-all duration-300 hover:-translate-y-[1px] relative overflow-hidden group">
+                                    
+                                    {/* Visual Accent for Exchanges */}
+                                    {v.forma_pagamento === "troca" && (
+                                      <div className="absolute top-0 bottom-0 left-0 w-1 bg-sky-400"></div>
+                                    )}
+                                    {v.observacao && v.observacao.includes("[Trocada/Devolvida") && (
+                                      <div className="absolute top-0 bottom-0 left-0 w-1 bg-rose-400"></div>
+                                    )}
+
+                                    {/* Left section: Shopping Bag / Photo & Details */}
+                                    <div className="flex items-center gap-3.5 flex-1 min-w-0">
+                                      <div className="relative shrink-0 select-none">
+                                        {/* Display photo of first item, or custom placeholder */}
+                                        {v.bolsas?.foto_url ? (
+                                          <img 
+                                            src={v.bolsas.foto_url} 
+                                            alt="Foto bolsa" 
+                                            className="w-12 h-12 rounded-xl object-cover border border-[#FCEEF3] shadow-xs group-hover:scale-102 transition-transform"
+                                          />
+                                        ) : (
+                                          <div className="w-12 h-12 rounded-xl bg-[#FFEBF2]/40 border border-[#EACAD6]/35 flex items-center justify-center text-[#D12D6C]">
+                                            <span className="material-symbols-outlined text-[20px]">shopping_bag</span>
+                                          </div>
                                         )}
-                                        {v.forma_pagamento === "troca" && idx === 0 && (
-                                          <span className="text-[8px] bg-sky-50 border border-sky-200 text-sky-600 font-extrabold uppercase px-1.5 py-0.5 rounded shrink-0" title="Este produto saiu como parte de uma troca">
-                                            Troca
+                                        
+                                        {/* Quantity Badge overlay */}
+                                        {v.itens.reduce((acc, item) => acc + item.qty, 0) > 1 && (
+                                          <span className="absolute -top-1.5 -right-1.5 bg-[#C9A84C] text-[#1A1A2E] text-[9px] font-black w-5 h-5 rounded-full flex items-center justify-center border-2 border-white shadow-sm">
+                                            {v.itens.reduce((acc, item) => acc + item.qty, 0)}
                                           </span>
                                         )}
                                       </div>
-                                    ))}
-                                  </div>
-                                </td>
-                                <td className="p-3">
-                                  <span className="text-[#29141B] font-medium">{v.clientes?.nome || "Consumidor Geral"}</span>
-                                </td>
-                                <td className="p-3 text-xs text-[#29141B]">
-                                  {profile?.role === "admin" ? (
-                                    <select
-                                      value={v.funcionario_id || ""}
-                                      onChange={async (e) => {
-                                        const newFid = e.target.value;
-                                        try {
-                                          const { error } = await supabase
-                                            .from("vendas")
-                                            .update({ funcionario_id: newFid || null })
-                                            .in("id", v.ids);
-                                          if (error) throw error;
-                                          loadAllData();
-                                        } catch (err) {
-                                          triggerToast("Erro ao atualizar colaborador: " + err.message);
-                                        }
-                                      }}
-                                      className="bg-white hover:bg-[#FCFAF9] text-[#29141B] border border-[#EACAD6] rounded-xl px-2 py-1 text-xs focus:ring-1 focus:ring-[#D12D6C] focus:border-[#D12D6C] outline-none cursor-pointer max-w-[150px] shadow-sm transition-all"
-                                    >
-                                      <option value="">Sem vendedor</option>
-                                      {funcionarios.map(f => (
-                                        <option key={f.id} value={f.id}>{f.nome}</option>
-                                      ))}
-                                    </select>
-                                  ) : (
-                                    <span className="font-semibold text-[#29141B]/80 flex items-center gap-1">
-                                      <span className="material-symbols-outlined text-[14px] text-[#29141B]/60">person</span>
-                                      {funcionarios.find(f => f.id === v.funcionario_id)?.nome || "Sem vendedor"}
-                                    </span>
-                                  )}
-                                </td>
-                                <td className="p-3">
-                                  <div className="flex flex-col gap-0.5">
-                                    <span className="font-bold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-100 w-fit text-xs">
-                                      R$ {Number(v.preco_vendido).toFixed(2)}
-                                    </span>
-                                    {v.tinha_desconto && (
-                                      <span className="text-[8px] text-[#D12D6C] bg-[#D12D6C]/10 border border-[#D12D6C]/20 uppercase font-bold tracking-widest px-1.5 py-0.5 rounded w-max mt-0.5">Promoção</span>
-                                    )}
-                                    {!v.tinha_desconto && Number(v.desconto_valor) > 0 && (
-                                      <>
-                                        <span className="text-[8px] text-[#D12D6C] bg-[#D12D6C]/10 border border-[#D12D6C]/20 uppercase font-bold tracking-widest px-1.5 py-0.5 rounded w-max mt-0.5">Desconto</span>
-                                        <span className="text-[10px] text-rose-600 font-bold mt-0.5">
-                                          - R$ {Number(v.desconto_valor).toFixed(2)}
-                                        </span>
-                                      </>
-                                    )}
-                                  </div>
-                                </td>
-                                <td className="p-3 text-xs text-[#29141B]/60 font-medium">
-                                  {new Date(v.created_at).toLocaleDateString("pt-BR")} - {new Date(v.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
-                                </td>
-                              </tr>
-                            ))}
-                            {vendasAgrupadasPorLoja.length === 0 && (
-                              <tr>
-                                <td colSpan={5} className="text-center text-[#29141B]/60 py-12 font-medium bg-white">
-                                  Nenhuma saída registrada ainda.
-                                </td>
-                              </tr>
-                            )}
-                          </tbody>
-                        </table>
-                      </div>
-
-                      {/* Visualização em Cards (Mobile) */}
-                      <div className="block md:hidden flex flex-col gap-3">
-                        {vendasAgrupadasPorLoja.map(v => (
-                          <div key={v.id} className="bg-white border border-[#EACAD6]/40 rounded-2xl p-4 flex flex-col gap-3 shadow-sm hover:bg-[#FCFAF9]/50 transition-colors">
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="flex flex-col gap-2 flex-1 min-w-0">
-                                {v.itens.map((item, idx) => (
-                                  <div key={idx} className="flex items-center gap-2">
-                                    <div>
-                                      <span className="block font-bold text-[#29141B] text-sm">
-                                        {item.nome} {item.qty > 1 ? `(x${item.qty})` : ""}
-                                      </span>
-                                      <span className="block text-[10px] text-[#29141B]/60">Cód: {item.codigo || "N/A"}</span>
+                                      
+                                      {/* Item metadata */}
+                                      <div className="flex flex-col min-w-0 gap-0.5">
+                                        <div className="flex flex-wrap items-center gap-1.5">
+                                          {v.itens.map((item, idx) => (
+                                            <span key={idx} className="font-extrabold text-[#29141B] text-xs tracking-tight truncate max-w-[200px]">
+                                              {item.nome}
+                                              {item.qty > 1 && <span className="text-[#a3832d] ml-1 font-black">({item.qty}x)</span>}
+                                              {idx < v.itens.length - 1 && <span className="text-[#29141B]/20 ml-1.5">+</span>}
+                                            </span>
+                                          ))}
+                                        </div>
+                                        
+                                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-0.5">
+                                          <span className="text-[10px] text-[#29141B]/45 font-semibold">
+                                            Cód: {v.bolsas?.codigo || "-"}
+                                          </span>
+                                          {v.observacao && v.observacao.includes("[Trocada/Devolvida") && (
+                                            <span 
+                                              onClick={() => handleRastrearTroca(v.bolsa_id, v.cliente_id)}
+                                              className="text-[8px] bg-rose-50 border border-rose-200 text-rose-600 font-extrabold uppercase px-1.5 py-0.5 rounded shrink-0 cursor-pointer hover:bg-rose-100 hover:border-rose-300 transition-all flex items-center gap-0.5" 
+                                              title="Clique para rastrear esta troca no histórico"
+                                            >
+                                              <span className="material-symbols-outlined text-[9px]">sync_alt</span>
+                                              Devolvida
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
                                     </div>
-                                    {v.observacao && v.observacao.includes("[Trocada/Devolvida") && idx === 0 && (
-                                      <span 
-                                        className="text-[8px] bg-rose-50 border border-rose-200 text-rose-600 font-extrabold uppercase px-1.5 py-0.5 rounded shrink-0 cursor-pointer hover:bg-rose-100 hover:border-rose-300 transition-all shadow-sm active:scale-95 flex items-center gap-0.5" 
-                                        title="Clique para rastrear esta troca no histórico"
-                                        onClick={() => handleRastrearTroca(item.bolsa_id, v.cliente_id)}
-                                      >
-                                        <span className="material-symbols-outlined text-[10px]">sync_alt</span>
-                                        Devolvida
-                                      </span>
-                                    )}
-                                    {v.forma_pagamento === "troca" && idx === 0 && (
-                                      <span className="text-[8px] bg-sky-50 border border-sky-200 text-sky-600 font-extrabold uppercase px-1.5 py-0.5 rounded shrink-0">
-                                        Troca
-                                      </span>
-                                    )}
+
+                                    {/* Middle section: CRM Customer & Seller details */}
+                                    <div className="grid grid-cols-2 gap-x-4 sm:flex sm:items-center sm:gap-6 shrink-0">
+                                      
+                                      {/* Customer details */}
+                                      <div className="flex flex-col justify-center">
+                                        <span className="text-[8px] uppercase tracking-wider font-bold text-[#29141B]/40">Cliente</span>
+                                        <span className="text-[#29141B] font-bold text-xs mt-0.5 truncate max-w-[120px]" title={v.clientes?.nome || "Consumidor Geral"}>
+                                          {v.clientes?.nome || "Consumidor Geral"}
+                                        </span>
+                                      </div>
+
+                                      {/* Vendedor Dropdown */}
+                                      <div className="flex flex-col justify-center">
+                                        <span className="text-[8px] uppercase tracking-wider font-bold text-[#29141B]/40">Vendedor</span>
+                                        {profile?.role === "admin" ? (
+                                          <div className="relative mt-0.5">
+                                            <select
+                                              value={v.funcionario_id || ""}
+                                              onChange={async (e) => {
+                                                const newFid = e.target.value;
+                                                try {
+                                                  const { error } = await supabase
+                                                    .from("vendas")
+                                                    .update({ funcionario_id: newFid || null })
+                                                    .in("id", v.ids);
+                                                  if (error) throw error;
+                                                  loadAllData();
+                                                  triggerToast("Vendedor atualizado com sucesso.");
+                                                } catch (err) {
+                                                  triggerToast("Erro ao atualizar colaborador: " + err.message);
+                                                }
+                                              }}
+                                              className="bg-[#FCFAF9] hover:bg-white text-[#29141B] border border-[#EACAD6]/80 rounded-lg px-2 py-0.5 text-[10px] font-bold focus:ring-1 focus:ring-[#D12D6C] focus:border-[#D12D6C] outline-none cursor-pointer max-w-[110px] shadow-2xs transition-all"
+                                            >
+                                              <option value="">Sem vendedor</option>
+                                              {funcionarios.map(f => (
+                                                <option key={f.id} value={f.id}>{f.nome}</option>
+                                              ))}
+                                            </select>
+                                          </div>
+                                        ) : (
+                                          <span className="font-bold text-[#29141B]/75 text-[10px] flex items-center gap-1 mt-1">
+                                            <span className="material-symbols-outlined text-[11px] text-[#29141B]/40">person</span>
+                                            {funcionarios.find(f => f.id === v.funcionario_id)?.nome || "Sem vendedor"}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+
+                                    {/* Right section: Price & Payment Method */}
+                                    <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center border-t border-[#EACAD6]/20 pt-3 sm:pt-0 sm:border-0 gap-2 shrink-0">
+                                      <div className="flex flex-col sm:items-end">
+                                        <span className="text-[8px] uppercase tracking-wider font-bold text-[#29141B]/40">Total Pago</span>
+                                        <span className="font-extrabold text-emerald-600 bg-emerald-50 border border-emerald-100/80 px-2.5 py-0.5 rounded-lg text-xs mt-0.5 shadow-3xs flex items-center gap-0.5 select-all">
+                                          R$ {Number(v.preco_vendido).toFixed(2)}
+                                        </span>
+                                      </div>
+
+                                      <div className="flex items-center gap-2">
+                                        {/* Time */}
+                                        <span className="text-[9px] text-[#29141B]/45 font-bold flex items-center gap-0.5 select-none">
+                                          <span className="material-symbols-outlined text-[10px] text-[#29141B]/35">schedule</span>
+                                          {new Date(v.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                                        </span>
+                                        
+                                        {/* Payment Method Badge */}
+                                        {(() => {
+                                          const pay = v.forma_pagamento?.toLowerCase() || "dinheiro";
+                                          let classes = "bg-slate-50 text-slate-600 border-slate-200";
+                                          let label = pay.toUpperCase();
+                                          let icon = "attach_money";
+
+                                          if (pay === "pix") {
+                                            classes = "bg-purple-50 text-purple-600 border-purple-200/60";
+                                            label = "PIX";
+                                            icon = "qr_code";
+                                          } else if (pay === "dinheiro") {
+                                            classes = "bg-emerald-50 text-emerald-600 border-emerald-200/60";
+                                            label = "Dinheiro";
+                                            icon = "payments";
+                                          } else if (pay === "credito" || pay === "credito_parcelado" || pay === "credito_a_vista") {
+                                            classes = "bg-indigo-50 text-indigo-600 border-indigo-200/60";
+                                            label = "Crédito";
+                                            icon = "credit_card";
+                                          } else if (pay === "debito") {
+                                            classes = "bg-blue-50 text-blue-600 border-blue-200/60";
+                                            label = "Débito";
+                                            icon = "credit_card";
+                                          } else if (pay === "troca") {
+                                            classes = "bg-sky-50 text-sky-600 border-sky-200/60";
+                                            label = "Troca";
+                                            icon = "sync_alt";
+                                          }
+
+                                          return (
+                                            <span className={`text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded border flex items-center gap-0.5 select-none ${classes}`} title={`Pago via ${label}`}>
+                                              <span className="material-symbols-outlined text-[9px]">{icon}</span>
+                                              {label}
+                                            </span>
+                                          );
+                                        })()}
+                                      </div>
+
+                                      {/* Manual discount or promotion tags */}
+                                      {v.tinha_desconto && (
+                                        <span className="text-[7px] text-[#D12D6C] bg-[#D12D6C]/5 border border-[#D12D6C]/15 uppercase font-bold tracking-widest px-1 py-0.2 rounded w-max select-none">Promoção</span>
+                                      )}
+                                      {!v.tinha_desconto && Number(v.desconto_valor) > 0 && (
+                                        <div className="flex items-center gap-1.5">
+                                          <span className="text-[7px] text-rose-500 bg-rose-50 border border-rose-150 uppercase font-black tracking-widest px-1 py-0.2 rounded select-none">Desconto</span>
+                                          <span className="text-[9px] text-rose-600 font-extrabold">- R$ {Number(v.desconto_valor).toFixed(2)}</span>
+                                        </div>
+                                      )}
+                                    </div>
+
                                   </div>
-                                ))}
+                                </React.Fragment>
+                              );
+                            })}
+                            
+                            {/* Load More Button or Empty State */}
+                            {vendasFiltradas.length === 0 ? (
+                              <div className="border-2 border-dashed border-[#FCEEF3] rounded-2xl p-12 text-center text-[#29141B]/40 text-xs font-semibold bg-[#FCFAF9] flex flex-col items-center gap-2 select-none">
+                                <span className="material-symbols-outlined text-3xl text-[#29141B]/20">inbox</span>
+                                Nenhuma saída encontrada com os filtros selecionados.
                               </div>
-                              <div className="flex flex-col items-end gap-1">
-                                <span className="font-bold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-100 text-xs shrink-0">
-                                  R$ {Number(v.preco_vendido).toFixed(2)}
-                                </span>
-                                {v.tinha_desconto && (
-                                  <span className="text-[8px] text-[#D12D6C] bg-[#D12D6C]/10 border border-[#D12D6C]/20 uppercase font-bold tracking-widest px-1.5 py-0.5 rounded w-max">Promoção</span>
-                                )}
-                                {!v.tinha_desconto && Number(v.desconto_valor) > 0 && (
-                                  <>
-                                    <span className="text-[8px] text-[#D12D6C] bg-[#D12D6C]/10 border border-[#D12D6C]/20 uppercase font-bold tracking-widest px-1.5 py-0.5 rounded w-max">Desconto</span>
-                                    <span className="text-[10px] text-rose-600 font-bold">
-                                      - R$ {Number(v.desconto_valor).toFixed(2)}
-                                    </span>
-                                  </>
-                                )}
-                              </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-3 border-t border-[#EACAD6]/30 pt-3 text-xs">
-                              <div>
-                                <span className="block text-[9px] uppercase tracking-wider font-bold text-[#29141B]/50">Cliente</span>
-                                <span className="text-[#29141B] font-medium block mt-0.5 truncate">{v.clientes?.nome || "Consumidor Geral"}</span>
-                              </div>
-                              <div>
-                                <span className="block text-[9px] uppercase tracking-wider font-bold text-[#29141B]/50">Data</span>
-                                <span className="text-[#29141B]/70 font-medium block mt-0.5 flex items-center gap-1">
-                                  <span className="material-symbols-outlined text-[12px] text-[#29141B]/60">calendar_month</span>
-                                  {new Date(v.created_at).toLocaleDateString("pt-BR")} - {new Date(v.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
-                                </span>
-                              </div>
-                            </div>
-
-                            <div className="border-t border-[#EACAD6]/30 pt-2.5 flex flex-col gap-1">
-                              <span className="text-[9px] uppercase tracking-wider font-bold text-[#29141B]/50">Vendedor</span>
-                              {profile?.role === "admin" ? (
-                                <select
-                                  value={v.funcionario_id || ""}
-                                  onChange={async (e) => {
-                                    const newFid = e.target.value;
-                                    try {
-                                      const { error } = await supabase
-                                        .from("vendas")
-                                        .update({ funcionario_id: newFid || null })
-                                        .in("id", v.ids);
-                                      if (error) throw error;
-                                      loadAllData();
-                                    } catch (err) {
-                                      triggerToast("Erro ao atualizar colaborador: " + err.message);
-                                    }
-                                  }}
-                                  className="w-full bg-white hover:bg-[#FCFAF9] text-[#29141B] border border-[#EACAD6] rounded-xl px-3 py-1.5 text-xs focus:ring-1 focus:ring-[#D12D6C] focus:border-[#D12D6C] outline-none cursor-pointer shadow-sm transition-all"
+                            ) : vendasFiltradas.length > saidasLimit ? (
+                              <div className="flex justify-center mt-3 select-none">
+                                <button
+                                  type="button"
+                                  onClick={() => setSaidasLimit(prev => prev + 10)}
+                                  className="py-2.5 px-6 rounded-full border border-[#C9A84C]/50 hover:border-[#C9A84C] bg-white hover:bg-[#C9A84C]/5 text-[#a3832d] font-bold text-xs uppercase tracking-widest shadow-2xs hover:shadow-sm cursor-pointer transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] flex items-center gap-2"
                                 >
-                                  <option value="">Sem vendedor</option>
-                                  {funcionarios.map(f => (
-                                    <option key={f.id} value={f.id}>{f.nome}</option>
-                                  ))}
-                                </select>
-                              ) : (
-                                <span className="font-semibold text-[#29141B]/80 text-xs flex items-center gap-1.5 mt-0.5">
-                                  <span className="material-symbols-outlined text-[14px] text-[#29141B]/60">person</span>
-                                  {funcionarios.find(f => f.id === v.funcionario_id)?.nome || "Sem vendedor"}
-                                </span>
-                              )}
-                            </div>
+                                  <span className="material-symbols-outlined text-sm animate-bounce">expand_more</span>
+                                  Carregar Mais Vendas
+                                  <span className="text-[10px] bg-[#C9A84C]/25 text-[#a3832d] font-black px-2 py-0.5 rounded-full select-none">
+                                    {vendasFiltradas.length - saidasLimit} restando
+                                  </span>
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="text-center text-[10px] font-bold text-[#29141B]/35 uppercase tracking-widest py-3 border-t border-[#FCEEF3]/50 select-none">
+                                ✨ Fim do histórico de vendas
+                              </div>
+                            )}
                           </div>
-                        ))}
-                      </div>
+                        );
+                      })()}
                     </section>
                   </div>
                 </div>
