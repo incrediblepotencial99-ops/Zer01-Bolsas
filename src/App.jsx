@@ -2295,7 +2295,7 @@ export default function App() {
 
         {/* Sub-header de Loja Ativa (Mobile Only - Popover Inline) */}
         {lojas.length > 0 && activeStore && (
-          <div className="md:hidden w-full bg-white border-b border-[#FCEEF3] px-container-padding py-2.5 flex justify-between items-center z-30 print:hidden shadow-xs relative">
+          <div className={`md:hidden w-full bg-white border-b border-[#FCEEF3] px-container-padding py-2.5 flex justify-between items-center print:hidden shadow-xs relative ${isLojaDrawerOpen ? 'z-[70]' : 'z-30'}`}>
             <span className="text-[10px] font-extrabold text-[#29141B]/60 uppercase tracking-wider">
               Loja:
             </span>
