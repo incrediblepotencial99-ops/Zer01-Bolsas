@@ -2319,8 +2319,8 @@ export default function App() {
           }
 
           /* Garantir que textos e valores em dourado apareçam bem e não fiquem apagados */
-          .text-\\[\\#C9A84C\\] {
-            color: #b3913b !important;
+          .text-\\[\\#D12D6C\\] {
+            color: #8C113E !important;
           }
           
           .bg-\\[\\#1A1A2E\\] {
@@ -4403,10 +4403,10 @@ export default function App() {
                                   )}
                                   <div className="flex items-center justify-between">
                                     <div className="flex flex-col">
-                                      <span className="text-[9px] font-black uppercase text-[#C9A84C] tracking-widest">{descVal > 0 ? "TOTAL COM DESCONTO" : "TOTAL"}</span>
+                                      <span className="text-[9px] font-black uppercase text-[#D12D6C] tracking-widest">{descVal > 0 ? "TOTAL COM DESCONTO" : "TOTAL"}</span>
                                       <span className="text-lg font-black text-[#29141B]">R$ {total.toFixed(2)}</span>
                                     </div>
-                                    <span className="text-[9px] bg-[#C9A84C]/10 text-[#a3832d] font-bold px-2 py-0.5 rounded-full">
+                                    <span className="text-[9px] bg-[#D12D6C]/10 text-[#B80E4D] font-bold px-2 py-0.5 rounded-full">
                                       {cart.reduce((acc, item) => acc + item.qty, 0)} itens
                                     </span>
                                   </div>
@@ -4657,7 +4657,7 @@ export default function App() {
                             }}
                             className={`px-3 py-1 rounded-full text-xs font-bold transition-all duration-200 cursor-pointer ${
                               saidasDateFilter === pill.id 
-                                ? "bg-[#C9A84C]/15 border border-[#C9A84C] text-[#a3832d] shadow-xs scale-102"
+                                ? "bg-[#D12D6C]/15 border border-[#D12D6C] text-[#B80E4D] shadow-xs scale-102"
                                 : "bg-[#FCFAF9] hover:bg-[#FFEBF2]/40 border border-[#EACAD6]/45 text-[#29141B]/75"
                             }`}
                           >
@@ -4723,7 +4723,7 @@ export default function App() {
                                   {isNewDay && (
                                     <div className="flex items-center gap-3 my-2 select-none col-span-full">
                                       <div className="h-[1px] bg-[#EACAD6]/45 flex-1"></div>
-                                      <span className="text-[9px] font-black uppercase tracking-widest text-[#a3832d] bg-[#C9A84C]/10 border border-[#C9A84C]/25 px-3 py-1 rounded-full shadow-xs flex items-center gap-1.5 select-none">
+                                      <span className="text-[9px] font-black uppercase tracking-widest text-[#B80E4D] bg-[#D12D6C]/10 border border-[#D12D6C]/25 px-3 py-1 rounded-full shadow-xs flex items-center gap-1.5 select-none">
                                         <span className="material-symbols-outlined text-[12px]">calendar_today</span>
                                         {dateHeader.charAt(0).toUpperCase() + dateHeader.slice(1)}
                                       </span>
@@ -4732,7 +4732,7 @@ export default function App() {
                                   )}
                                   
                                   {/* Premium Transaction Bar (Combined for Desktop & Mobile) */}
-                                  <div className="bg-white border border-[#EACAD6]/35 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs hover:shadow-[0_4px_16px_rgba(201,168,76,0.06)] hover:border-[#C9A84C]/35 transition-all duration-300 hover:-translate-y-[1px] relative overflow-hidden group">
+                                  <div className="bg-white border border-[#EACAD6]/35 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs hover:shadow-[0_4px_16px_rgba(209,45,108,0.06)] hover:border-[#D12D6C]/35 transition-all duration-300 hover:-translate-y-[1px] relative overflow-hidden group">
                                     
                                     {/* Visual Accent for Exchanges */}
                                     {v.forma_pagamento === "troca" && (
@@ -4760,7 +4760,7 @@ export default function App() {
                                         
                                         {/* Quantity Badge overlay */}
                                         {v.itens.reduce((acc, item) => acc + item.qty, 0) > 1 && (
-                                          <span className="absolute -top-1.5 -right-1.5 bg-[#C9A84C] text-[#1A1A2E] text-[9px] font-black w-5 h-5 rounded-full flex items-center justify-center border-2 border-white shadow-sm">
+                                          <span className="absolute -top-1.5 -right-1.5 bg-[#D12D6C] text-white text-[9px] font-black w-5 h-5 rounded-full flex items-center justify-center border-2 border-white shadow-sm">
                                             {v.itens.reduce((acc, item) => acc + item.qty, 0)}
                                           </span>
                                         )}
@@ -4772,7 +4772,7 @@ export default function App() {
                                           {v.itens.map((item, idx) => (
                                             <span key={idx} className="font-extrabold text-[#29141B] text-xs tracking-tight truncate max-w-[200px]">
                                               {item.nome}
-                                              {item.qty > 1 && <span className="text-[#a3832d] ml-1 font-black">({item.qty}x)</span>}
+                                              {item.qty > 1 && <span className="text-[#B80E4D] ml-1 font-black">({item.qty}x)</span>}
                                               {idx < v.itens.length - 1 && <span className="text-[#29141B]/20 ml-1.5">+</span>}
                                             </span>
                                           ))}
@@ -4927,11 +4927,11 @@ export default function App() {
                                 <button
                                   type="button"
                                   onClick={() => setSaidasLimit(prev => prev + 10)}
-                                  className="py-2.5 px-6 rounded-full border border-[#C9A84C]/50 hover:border-[#C9A84C] bg-white hover:bg-[#C9A84C]/5 text-[#a3832d] font-bold text-xs uppercase tracking-widest shadow-2xs hover:shadow-sm cursor-pointer transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] flex items-center gap-2"
+                                  className="py-2.5 px-6 rounded-full border border-[#D12D6C]/50 hover:border-[#D12D6C] bg-white hover:bg-[#D12D6C]/5 text-[#B80E4D] font-bold text-xs uppercase tracking-widest shadow-2xs hover:shadow-sm cursor-pointer transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] flex items-center gap-2"
                                 >
                                   <span className="material-symbols-outlined text-sm animate-bounce">expand_more</span>
                                   Carregar Mais Vendas
-                                  <span className="text-[10px] bg-[#C9A84C]/25 text-[#a3832d] font-black px-2 py-0.5 rounded-full select-none">
+                                  <span className="text-[10px] bg-[#D12D6C]/25 text-[#B80E4D] font-black px-2 py-0.5 rounded-full select-none">
                                     {vendasFiltradas.length - saidasLimit} restando
                                   </span>
                                 </button>
@@ -5623,7 +5623,7 @@ export default function App() {
                                 id={`troca-row-${t.id}`}
                                 className={`border-b border-[#FCEEF3] transition-all duration-500 ${
                                   highlightedExchangeId === t.id 
-                                    ? "bg-[#C9A84C]/15 border-l-4 border-l-[#C9A84C] font-semibold scale-[1.01] shadow-[0_2px_8px_rgba(201,168,76,0.15)] animate-pulse" 
+                                    ? "bg-[#D12D6C]/15 border-l-4 border-l-[#D12D6C] font-semibold scale-[1.01] shadow-[0_2px_8px_rgba(209,45,108,0.15)] animate-pulse" 
                                     : "hover:bg-[#FFEBF2]/10"
                                 }`}
                               >
@@ -5676,7 +5676,7 @@ export default function App() {
                             id={`troca-card-${t.id}`}
                             className={`border transition-all duration-500 rounded-2xl p-4 flex flex-col gap-3 shadow-sm ${
                               highlightedExchangeId === t.id 
-                                ? "bg-[#C9A84C]/15 border-[#C9A84C] border-2 ring-2 ring-[#C9A84C]/30 scale-[1.02] animate-pulse" 
+                                ? "bg-[#D12D6C]/15 border-[#D12D6C] border-2 ring-2 ring-[#D12D6C]/30 scale-[1.02] animate-pulse" 
                                 : "bg-white border-[#FCEEF3] hover:bg-[#FFEBF2]/10"
                             }`}
                           >
@@ -7309,11 +7309,11 @@ export default function App() {
                       <span className="text-[9px] uppercase tracking-wider text-[#29141B]/70 font-extrabold">Total Compras</span>
                       <span className="text-xl font-black text-[#29141B] mt-1">{clientSales.length} un.</span>
                     </div>
-                    <div className="bg-[#FCFAF9] border border-[#C9A84C]/45 rounded-2xl p-3.5 flex flex-col justify-between shadow-sm border-l-4 border-l-[#C9A84C]">
+                    <div className="bg-[#FCFAF9] border border-[#D12D6C]/45 rounded-2xl p-3.5 flex flex-col justify-between shadow-sm border-l-4 border-l-[#D12D6C]">
                       <span className="text-[9px] uppercase tracking-wider text-[#29141B]/70 font-extrabold">Total Investido</span>
                       <span className="text-xl font-black text-emerald-700 mt-1">R$ {totalSpent.toFixed(2)}</span>
                     </div>
-                    <div className="bg-[#FCFAF9] border border-[#C9A84C]/45 rounded-2xl p-3.5 flex flex-col justify-between shadow-sm border-l-4 border-l-[#C9A84C]">
+                    <div className="bg-[#FCFAF9] border border-[#D12D6C]/45 rounded-2xl p-3.5 flex flex-col justify-between shadow-sm border-l-4 border-l-[#D12D6C]">
                       <span className="text-[9px] uppercase tracking-wider text-[#29141B]/70 font-extrabold">Trocas Efetuadas</span>
                       <span className="text-xl font-black text-amber-700 mt-1">{clientExchanges.length} un.</span>
                     </div>
@@ -7542,14 +7542,14 @@ export default function App() {
               animate={{ x: 0 }}
               exit={{ x: "100%" }}
               transition={{ type: "spring", damping: 26, stiffness: 220 }}
-              className="fixed top-0 right-0 bottom-0 w-full max-w-[380px] bg-[#1A1A2E] border-l border-[#C9A84C]/25 text-white z-[151] shadow-[0_0_60px_rgba(0,0,0,0.85)] flex flex-col font-sans"
+              className="fixed top-0 right-0 bottom-0 w-full max-w-[380px] bg-[#1A1A2E] border-l border-[#D12D6C]/25 text-white z-[151] shadow-[0_0_60px_rgba(0,0,0,0.85)] flex flex-col font-sans"
             >
               {/* Header do Drawer */}
-              <div className="p-6 border-b border-[#C9A84C]/15 flex items-center justify-between">
+              <div className="p-6 border-b border-[#D12D6C]/15 flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <span className="material-symbols-outlined text-[#C9A84C] text-[24px]">storefront</span>
+                  <span className="material-symbols-outlined text-[#D12D6C] text-[24px]">storefront</span>
                   <div>
-                    <h3 className="text-sm font-extrabold tracking-widest text-[#C9A84C] uppercase">Selecione a Loja</h3>
+                    <h3 className="text-sm font-extrabold tracking-widest text-[#D12D6C] uppercase">Selecione a Loja</h3>
                     <p className="text-[10px] text-white/40">Unidades de atendimento Zero 1</p>
                   </div>
                 </div>
@@ -7581,23 +7581,23 @@ export default function App() {
                       disabled={!canChange}
                       className={`w-full text-left flex items-center gap-4.5 p-4 rounded-2xl transition-all duration-300 border cursor-pointer ${
                         isSelected
-                          ? 'bg-[#C9A84C]/10 border-[#C9A84C]/50 shadow-[0_4px_20px_rgba(201,168,76,0.15)]'
+                          ? 'bg-[#D12D6C]/10 border-[#D12D6C]/50 shadow-[0_4px_20px_rgba(209,45,108,0.15)]'
                           : 'hover:bg-white/5 border-white/5 bg-white/[0.01]'
                       } ${!canChange && 'opacity-50 cursor-not-allowed'}`}
                     >
                       <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${
-                        isSelected ? 'bg-[#C9A84C]/20 text-[#C9A84C]' : 'bg-white/5 text-white/40'
+                        isSelected ? 'bg-[#D12D6C]/20 text-[#D12D6C]' : 'bg-white/5 text-white/40'
                       }`}>
                         <span className="material-symbols-outlined text-[20px]">store</span>
                       </div>
                       <div className="flex flex-col flex-1 min-w-0">
-                        <span className={`text-xs font-bold tracking-wide truncate ${ isSelected ? 'text-[#C9A84C]' : 'text-white/90'}`}>{l.nome}</span>
+                        <span className={`text-xs font-bold tracking-wide truncate ${ isSelected ? 'text-[#D12D6C]' : 'text-white/90'}`}>{l.nome}</span>
                         <span className="text-[9px] text-white/35 mt-0.5">{l.nome === 'Loja Matriz' ? 'Unidade Central' : 'Filial de Operações'}</span>
                       </div>
                       {isSelected ? (
-                        <div className="flex items-center gap-1.5 shrink-0 bg-[#C9A84C]/25 border border-[#C9A84C]/40 px-2 py-0.5 rounded-md">
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#C9A84C] animate-pulse" />
-                          <span className="text-[8px] font-black text-[#C9A84C] uppercase tracking-wider">Ativa</span>
+                        <div className="flex items-center gap-1.5 shrink-0 bg-[#D12D6C]/25 border border-[#D12D6C]/40 px-2 py-0.5 rounded-md">
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#D12D6C] animate-pulse" />
+                          <span className="text-[8px] font-black text-[#D12D6C] uppercase tracking-wider">Ativa</span>
                         </div>
                       ) : (
                         <span className="material-symbols-outlined text-[16px] text-white/20 hover:text-white/40 transition-colors">chevron_right</span>
@@ -7608,14 +7608,14 @@ export default function App() {
               </div>
 
               {/* Footer do Drawer */}
-              <div className="p-6 border-t border-[#C9A84C]/15 bg-black/20 flex flex-col gap-2.5">
+              <div className="p-6 border-t border-[#D12D6C]/15 bg-black/20 flex flex-col gap-2.5">
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] text-white/45 font-semibold">Operador Logado:</span>
                   <span className="text-xs font-bold text-white/95">{profile?.nome}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] text-white/45 font-semibold">Nível de Acesso:</span>
-                  <span className="text-[8px] font-black uppercase tracking-widest bg-[#C9A84C]/10 border border-[#C9A84C]/25 text-[#C9A84C] px-2 py-0.5 rounded-md">
+                  <span className="text-[8px] font-black uppercase tracking-widest bg-[#D12D6C]/10 border border-[#D12D6C]/25 text-[#D12D6C] px-2 py-0.5 rounded-md">
                     {profile?.role === 'admin' ? 'Administrador' : 'Colaborador'}
                   </span>
                 </div>
