@@ -7767,7 +7767,7 @@ export default function App() {
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 30, scale: 0.95 }}
                 transition={{ type: "spring", damping: 25, stiffness: 220 }}
-                className="w-[92vw] sm:w-[380px] h-[520px] bg-white border border-[#EACAD6]/60 rounded-3xl shadow-[0_12px_40px_rgba(41,20,27,0.15)] flex flex-col overflow-hidden mb-4 relative z-50 font-sans"
+                className="fixed inset-0 sm:absolute sm:inset-auto sm:bottom-16 sm:right-0 w-full sm:w-[360px] h-full sm:h-[480px] sm:mb-4 bg-white border-0 sm:border border-[#EACAD6]/60 rounded-none sm:rounded-3xl shadow-[0_12px_40px_rgba(41,20,27,0.15)] flex flex-col overflow-hidden z-50 font-sans"
               >
                 {/* Header */}
                 <div className="bg-[#29141B] text-white p-4.5 flex items-center justify-between border-b border-[#D12D6C]/20">
