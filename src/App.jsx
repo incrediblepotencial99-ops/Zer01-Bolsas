@@ -442,18 +442,42 @@ export default function App() {
     const textoMsg = chatInput.trim();
     setChatInput(""); // Clear immediately for speed
 
+    // Criar mensagem temporária para atualização instantânea (Optimistic UI)
+    const tempId = "temp-" + Date.now();
+    const tempMsg = {
+      id: tempId,
+      remetente_id: session.user.id,
+      loja_id: activeStore?.id || null,
+      texto: textoMsg,
+      created_at: new Date().toISOString(),
+      profiles: { nome: profile.nome },
+      lojas: activeStore ? { nome: activeStore.nome } : null,
+      temp: true
+    };
+
+    // Adicionar instantaneamente ao estado local de chat
+    setChatMessages((prev) => [...prev, tempMsg]);
+
     try {
-      const { error } = await supabase.from("mensagens_chat").insert({
+      const { data, error } = await supabase.from("mensagens_chat").insert({
         remetente_id: session.user.id,
         loja_id: activeStore?.id || null,
         texto: textoMsg,
-      });
+      }).select().single();
 
       if (error) {
         triggerToast("Erro ao enviar mensagem: " + error.message);
+        // Remover a mensagem temporária em caso de falha
+        setChatMessages((prev) => prev.filter((m) => m.id !== tempId));
+      } else if (data) {
+        // Substituir o ID temporário pelo real retornado pelo banco
+        setChatMessages((prev) => 
+          prev.map((m) => m.id === tempId ? { ...m, id: data.id, temp: false } : m)
+        );
       }
     } catch (err) {
       console.error(err);
+      setChatMessages((prev) => prev.filter((m) => m.id !== tempId));
     }
   };
 
