@@ -7680,7 +7680,7 @@ export default function App() {
         })()}
       </AnimatePresence>
 
-      {/* ── LOJA SELECTION DRAWER (Premium & Luxury) ── */}
+      {/* ── LOJA SELECTION MODAL (Premium & Luxury) ── */}
       <AnimatePresence>
         {isLojaDrawerOpen && (
           <>
@@ -7690,93 +7690,97 @@ export default function App() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setIsLojaDrawerOpen(false)}
-              className="fixed inset-0 bg-black/60 backdrop-blur-xs z-[150]"
+              className="fixed inset-0 bg-[#0F0F1A]/80 backdrop-blur-md z-[150]"
             />
-            {/* Gaveta (Drawer) Lateral */}
-            <motion.div
-              initial={{ x: "100%" }}
-              animate={{ x: 0 }}
-              exit={{ x: "100%" }}
-              transition={{ type: "spring", damping: 26, stiffness: 220 }}
-              className="fixed top-0 right-0 bottom-0 w-full max-w-[380px] bg-[#1A1A2E] border-l border-[#D12D6C]/25 text-white z-[151] shadow-[0_0_60px_rgba(0,0,0,0.85)] flex flex-col font-sans"
-            >
-              {/* Header do Drawer */}
-              <div className="p-6 border-b border-[#D12D6C]/15 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <span className="material-symbols-outlined text-[#D12D6C] text-[24px]">storefront</span>
-                  <div>
-                    <h3 className="text-sm font-extrabold tracking-widest text-[#D12D6C] uppercase">Selecione a Loja</h3>
-                    <p className="text-[10px] text-white/40">Unidades de atendimento Aura</p>
+            {/* Modal Card Container */}
+            <div className="fixed inset-0 flex items-center justify-center z-[151] pointer-events-none p-4">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                transition={{ type: "spring", damping: 25, stiffness: 220 }}
+                className="w-full max-w-[390px] bg-[#1A1A2E]/98 border border-[#D12D6C]/30 text-white shadow-[0_20px_50px_rgba(0,0,0,0.8)] flex flex-col font-sans rounded-3xl overflow-hidden pointer-events-auto"
+              >
+                {/* Header do Modal */}
+                <div className="p-5 border-b border-[#D12D6C]/15 flex items-center justify-between bg-black/10">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#D12D6C] to-[#FC5897] flex items-center justify-center text-white shadow-[0_4px_12px_rgba(209,45,108,0.3)]">
+                      <span className="material-symbols-outlined text-[20px]">storefront</span>
+                    </div>
+                    <div>
+                      <h3 className="text-xs font-black tracking-widest text-[#D12D6C] uppercase">Selecione a Loja</h3>
+                      <p className="text-[9px] text-white/40 font-semibold mt-0.5">Unidades de atendimento Aura</p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => setIsLojaDrawerOpen(false)}
+                    className="w-7 h-7 rounded-full flex items-center justify-center bg-white/5 hover:bg-white/10 active:scale-95 border border-white/10 text-white/70 hover:text-white transition-all cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">close</span>
+                  </button>
+                </div>
+
+                {/* Lojas List */}
+                <div className="max-h-[280px] overflow-y-auto p-5 flex flex-col gap-3">
+                  {(profile?.role === 'admin'
+                    ? lojas
+                    : lojas.filter(l => funcionarioLojas.some(fl => fl.funcionario_id === profile.id && fl.loja_id === l.id))
+                  ).map(l => {
+                    const isSelected = activeStore?.id === l.id;
+                    const canChange = profile?.role === 'admin' || funcionarioLojas.filter(fl => fl.funcionario_id === profile.id).length > 1;
+                    return (
+                      <button
+                        key={l.id}
+                        onClick={() => {
+                          if (!canChange) return;
+                          handleSetActiveStore(l);
+                          setIsLojaDrawerOpen(false);
+                          triggerToast(`Loja alterada para: ${l.nome}`);
+                        }}
+                        disabled={!canChange}
+                        className={`w-full text-left flex items-center gap-3.5 p-3 rounded-2xl transition-all duration-300 border cursor-pointer ${
+                          isSelected
+                            ? 'bg-[#D12D6C]/10 border-[#D12D6C]/50 shadow-[0_4px_15px_rgba(209,45,108,0.12)]'
+                            : 'hover:bg-white/5 border-white/5 bg-white/[0.01]'
+                        } ${!canChange && 'opacity-50 cursor-not-allowed'}`}
+                      >
+                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center transition-colors ${
+                          isSelected ? 'bg-[#D12D6C]/20 text-[#D12D6C]' : 'bg-white/5 text-white/40'
+                        }`}>
+                          <span className="material-symbols-outlined text-[18px]">store</span>
+                        </div>
+                        <div className="flex flex-col flex-1 min-w-0">
+                          <span className={`text-[11px] font-bold tracking-wide truncate ${ isSelected ? 'text-[#D12D6C]' : 'text-white/90'}`}>{l.nome}</span>
+                          <span className="text-[8px] text-white/35 mt-0.5">{l.nome === 'Loja Matriz' ? 'Unidade Central' : 'Filial de Operações'}</span>
+                        </div>
+                        {isSelected ? (
+                          <div className="flex items-center gap-1 shrink-0 bg-[#D12D6C]/25 border border-[#D12D6C]/40 px-1.5 py-0.5 rounded-md">
+                            <span className="w-1 h-1 rounded-full bg-[#D12D6C] animate-pulse" />
+                            <span className="text-[7px] font-black text-[#D12D6C] uppercase tracking-wider">Ativa</span>
+                          </div>
+                        ) : (
+                          <span className="material-symbols-outlined text-[14px] text-white/20 hover:text-white/40 transition-colors">chevron_right</span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Footer do Modal */}
+                <div className="p-5 border-t border-[#D12D6C]/15 bg-black/20 flex flex-col gap-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[9px] text-white/45 font-semibold">Operador Logado:</span>
+                    <span className="text-[11px] font-bold text-white/95">{profile?.nome}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[9px] text-white/45 font-semibold">Nível de Acesso:</span>
+                    <span className="text-[7px] font-black uppercase tracking-widest bg-[#D12D6C]/10 border border-[#D12D6C]/25 text-[#D12D6C] px-1.5 py-0.5 rounded-md">
+                      {profile?.role === 'admin' ? 'Administrador' : 'Colaborador'}
+                    </span>
                   </div>
                 </div>
-                <button 
-                  onClick={() => setIsLojaDrawerOpen(false)}
-                  className="w-8 h-8 rounded-full flex items-center justify-center bg-white/5 hover:bg-white/10 active:scale-95 border border-white/10 text-white/70 hover:text-white transition-all cursor-pointer"
-                >
-                  <span className="material-symbols-outlined text-[18px]">close</span>
-                </button>
-              </div>
-
-              {/* Lojas List */}
-              <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-3.5">
-                {(profile?.role === 'admin'
-                  ? lojas
-                  : lojas.filter(l => funcionarioLojas.some(fl => fl.funcionario_id === profile.id && fl.loja_id === l.id))
-                ).map(l => {
-                  const isSelected = activeStore?.id === l.id;
-                  const canChange = profile?.role === 'admin' || funcionarioLojas.filter(fl => fl.funcionario_id === profile.id).length > 1;
-                  return (
-                    <button
-                      key={l.id}
-                      onClick={() => {
-                        if (!canChange) return;
-                        handleSetActiveStore(l);
-                        setIsLojaDrawerOpen(false);
-                        triggerToast(`Loja alterada para: ${l.nome}`);
-                      }}
-                      disabled={!canChange}
-                      className={`w-full text-left flex items-center gap-4.5 p-4 rounded-2xl transition-all duration-300 border cursor-pointer ${
-                        isSelected
-                          ? 'bg-[#D12D6C]/10 border-[#D12D6C]/50 shadow-[0_4px_20px_rgba(209,45,108,0.15)]'
-                          : 'hover:bg-white/5 border-white/5 bg-white/[0.01]'
-                      } ${!canChange && 'opacity-50 cursor-not-allowed'}`}
-                    >
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${
-                        isSelected ? 'bg-[#D12D6C]/20 text-[#D12D6C]' : 'bg-white/5 text-white/40'
-                      }`}>
-                        <span className="material-symbols-outlined text-[20px]">store</span>
-                      </div>
-                      <div className="flex flex-col flex-1 min-w-0">
-                        <span className={`text-xs font-bold tracking-wide truncate ${ isSelected ? 'text-[#D12D6C]' : 'text-white/90'}`}>{l.nome}</span>
-                        <span className="text-[9px] text-white/35 mt-0.5">{l.nome === 'Loja Matriz' ? 'Unidade Central' : 'Filial de Operações'}</span>
-                      </div>
-                      {isSelected ? (
-                        <div className="flex items-center gap-1.5 shrink-0 bg-[#D12D6C]/25 border border-[#D12D6C]/40 px-2 py-0.5 rounded-md">
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#D12D6C] animate-pulse" />
-                          <span className="text-[8px] font-black text-[#D12D6C] uppercase tracking-wider">Ativa</span>
-                        </div>
-                      ) : (
-                        <span className="material-symbols-outlined text-[16px] text-white/20 hover:text-white/40 transition-colors">chevron_right</span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Footer do Drawer */}
-              <div className="p-6 border-t border-[#D12D6C]/15 bg-black/20 flex flex-col gap-2.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] text-white/45 font-semibold">Operador Logado:</span>
-                  <span className="text-xs font-bold text-white/95">{profile?.nome}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] text-white/45 font-semibold">Nível de Acesso:</span>
-                  <span className="text-[8px] font-black uppercase tracking-widest bg-[#D12D6C]/10 border border-[#D12D6C]/25 text-[#D12D6C] px-2 py-0.5 rounded-md">
-                    {profile?.role === 'admin' ? 'Administrador' : 'Colaborador'}
-                  </span>
-                </div>
-              </div>
-            </motion.div>
+              </motion.div>
+            </div>
           </>
         )}
       </AnimatePresence>
