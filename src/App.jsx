@@ -619,7 +619,7 @@ export default function App() {
       .replace(/_+/g, "_")
       .trim();
     
-    link.setAttribute("download", `Vendas_Zero1Bags_${periodoSlug}.csv`);
+    link.setAttribute("download", `Vendas_AuraBolsas_${periodoSlug}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -640,13 +640,13 @@ export default function App() {
     }
 
     const textoResumo = 
-`📊 *ZERO 1 BAGS - RESUMO FINANCEIRO* 📊
+`📊 *AURA BOLSAS - RESUMO FINANCEIRO* 📊
 📅 Período: ${periodoFormatado}
 👥 Filtro: ${vendedorNome}
 💰 Faturamento Bruto: ${totalFaturado}
 🛍️ Quantidade de Vendas: ${qtdVendas} unidades
 ⭐ Gerado em: ${new Date().toLocaleString("pt-BR")}
-🔗 Sistema Zero 1 Bags`;
+🔗 Sistema Aura Bolsas`;
 
     if (navigator.clipboard && window.isSecureContext) {
       navigator.clipboard.writeText(textoResumo).then(() => {
@@ -684,7 +684,7 @@ export default function App() {
     const anoFmt = hojeData.getFullYear();
     const horaFmt = String(hojeData.getHours()).padStart(2, '0');
     const minFmt = String(hojeData.getMinutes()).padStart(2, '0');
-    const nomeArquivo = `Relatorio_Zero1_${diaFmt}-${mesFmt}-${anoFmt}_${horaFmt}${minFmt}`;
+    const nomeArquivo = `Relatorio_Aura_${diaFmt}-${mesFmt}-${anoFmt}_${horaFmt}${minFmt}`;
     const dataHoraGeracao = `${diaFmt}/${mesFmt}/${anoFmt} às ${horaFmt}:${minFmt}`;
 
     const operadorNome = profile?.nome || "Administrador";
@@ -2089,7 +2089,7 @@ export default function App() {
     return (
       <div className="min-h-screen flex items-center justify-center flex-col gap-4 bg-[#f8f9ff]">
         <div className="w-12 h-12 border-4 border-secondary/20 border-t-secondary rounded-full animate-spin" />
-        <h2 className="text-xl font-bold text-on-background tracking-widest font-headline-md">Zero Um</h2>
+        <h2 className="text-xl font-bold text-on-background tracking-widest font-headline-md">Aura</h2>
         <p className="text-sm text-on-tertiary-container font-body-sm">Carregando sistema...</p>
       </div>
     );
@@ -2117,8 +2117,8 @@ export default function App() {
 
           <div className="text-center flex flex-col items-center select-none">
             <img 
-              src="/logo.jpg" 
-              alt="Logo Zero 1 Bags" 
+              src="/logo.png" 
+              alt="Logo Aura Bags" 
               className="w-48 h-20 object-contain mb-3"
             />
             {/* Nome duplicado removido para evitar repetição */}
@@ -2335,8 +2335,8 @@ export default function App() {
       <aside className="hidden md:flex flex-col fixed inset-y-0 left-0 z-50 h-full w-80 rounded-r-xl bg-surface-container-lowest shadow-xl border-r border-outline-variant py-6 print:hidden">
         <div className="px-6 mb-6 flex flex-col items-center border-b border-outline-variant pb-5 select-none">
           <img 
-            src="/logo.jpg" 
-            alt="Logo Zero 1 Bags" 
+            src="/logo.png" 
+            alt="Logo Aura Bags" 
             className="w-40 h-16 object-contain mb-2"
           />
           <span className="font-extrabold text-[10px] text-[#29141B]/55 tracking-widest uppercase mb-1">
@@ -2385,8 +2385,8 @@ export default function App() {
           
           <div className="flex-1 flex justify-center">
             <img 
-              src="/logo.jpg" 
-              alt="Logo Zero 1 Bags" 
+              src="/logo.png" 
+              alt="Logo Aura Bags" 
               className="w-32 h-10 object-contain select-none"
             />
           </div>
@@ -5837,7 +5837,7 @@ export default function App() {
                     <div className="hidden print:flex flex-col gap-2 border-b-2 border-[#29141B]/40 pb-4 mb-4">
                       <div className="flex justify-between items-end">
                         <div>
-                          <h1 className="text-3xl font-extrabold text-[#D12D6C]">ZERO UM</h1>
+                          <h1 className="text-3xl font-extrabold text-[#D12D6C]">AURA</h1>
                           <p className="text-xs uppercase font-extrabold tracking-widest text-[#29141B]/60">Stock & Sales Manager - Relatório Financeiro</p>
                         </div>
                         <div className="text-right text-xs text-[#29141B]/60 font-medium">
@@ -6389,7 +6389,7 @@ export default function App() {
                     <div className="hidden print:block border-t-2 border-[#29141B]/30 pt-4 mt-4">
                       <div className="flex justify-between items-end text-[10px] text-[#29141B]/50">
                         <div>
-                          <p className="font-extrabold text-[#D12D6C] text-sm">ZERO UM</p>
+                          <p className="font-extrabold text-[#D12D6C] text-sm">AURA</p>
                           <p>Stock & Sales Manager — Relatório Financeiro</p>
                         </div>
                         <div className="text-right">
@@ -6406,7 +6406,7 @@ export default function App() {
                     <span className="material-symbols-outlined text-6xl text-red-600 bg-red-50 p-4 rounded-full border border-red-100">lock</span>
                     <h2 className="text-xl font-extrabold text-[#29141B]">Acesso Restrito</h2>
                     <p className="text-xs text-[#29141B]/60 leading-relaxed">
-                      Esta área é reservada exclusivamente para o **Administrador Geral** do sistema Zero Um.
+                      Esta área é reservada exclusivamente para o **Administrador Geral** do sistema Aura.
                       Se você é gerente, certifique-se de que sua conta possui privilégios de administrador ativos.
                     </p>
                   </div>
@@ -6436,7 +6436,7 @@ export default function App() {
                               {editingFuncionario ? "Atualizar Cadastro" : "Registrar Funcionário"}
                             </h2>
                             <p className="text-[10px] text-[#29141B]/60 font-semibold tracking-wide mt-0.5">
-                              {editingFuncionario ? `Editando dados de ${editingFuncionario.nome}` : "Gestão de acessos à equipe Zero Um"}
+                              {editingFuncionario ? `Editando dados de ${editingFuncionario.nome}` : "Gestão de acessos à equipe Aura"}
                             </p>
                           </div>
                         </div>
@@ -6862,7 +6862,7 @@ export default function App() {
                     <span className="material-symbols-outlined text-6xl text-red-500 bg-[#FFEBF2] p-4 rounded-full border border-[#FAD6E5]">lock</span>
                     <h2 className="text-xl font-extrabold text-[#29141B]">Acesso Restrito</h2>
                     <p className="text-xs text-[#29141B]/60 leading-relaxed">
-                      Esta área é reservada exclusivamente para o **Administrador Geral** do sistema Zero Um.
+                      Esta área é reservada exclusivamente para o **Administrador Geral** do sistema Aura.
                       Se você é gerente, certifique-se de que sua conta possui privilégios de administrador ativos.
                     </p>
                   </div>
@@ -7198,7 +7198,7 @@ export default function App() {
                     required 
                     value={formLoja.nome} 
                     onChange={e => setFormLoja({ ...formLoja, nome: e.target.value })} 
-                    placeholder="e.g. Zero Um - Copacabana" 
+                    placeholder="e.g. Aura - Copacabana" 
                     className="h-11 w-full rounded-xl border-2 border-[#EACAD6] bg-[#FCFAF9] px-3.5 text-[#29141B] text-xs font-bold outline-none focus:border-[#D12D6C] focus:bg-white"
                   />
                 </div>
@@ -7550,7 +7550,7 @@ export default function App() {
                   <span className="material-symbols-outlined text-[#D12D6C] text-[24px]">storefront</span>
                   <div>
                     <h3 className="text-sm font-extrabold tracking-widest text-[#D12D6C] uppercase">Selecione a Loja</h3>
-                    <p className="text-[10px] text-white/40">Unidades de atendimento Zero 1</p>
+                    <p className="text-[10px] text-white/40">Unidades de atendimento Aura</p>
                   </div>
                 </div>
                 <button 

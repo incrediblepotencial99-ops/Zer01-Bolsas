@@ -1,5 +1,5 @@
 /**
- * Módulo de template para geração de relatórios em PDF do Zero Um Stock Manager.
+ * Módulo de template para geração de relatórios em PDF do Aura Stock Manager.
  * Exporta o HTML e CSS diagramado em 3 páginas A4 limpas no estilo premium dourado/escuro.
  */
 
@@ -506,9 +506,9 @@ export const gerarRelatorioHtml = ({
         <div class="page">
           <div class="print-header">
             <div class="print-header-left">
-              <div class="logo-box">01</div>
+              <div class="logo-box">AU</div>
               <div>
-                <h1 class="store-title">Zero Um Stock Manager</h1>
+                <h1 class="store-title">Aura Stock Manager</h1>
                 <p class="store-subtitle">Painel de Controle Executivo</p>
               </div>
             </div>
@@ -595,7 +595,7 @@ export const gerarRelatorioHtml = ({
           </div>
           
           <div class="print-footer">
-            Zero Um Stock Manager &nbsp;|&nbsp; Página 1 de 3 &nbsp;|&nbsp; Confidencial &nbsp;|&nbsp; Gerado pelo Sistema
+            Aura Stock Manager &nbsp;|&nbsp; Página 1 de 3 &nbsp;|&nbsp; Confidencial &nbsp;|&nbsp; Gerado pelo Sistema
           </div>
         </div>
         
@@ -603,9 +603,9 @@ export const gerarRelatorioHtml = ({
         <div class="page">
           <div class="print-header">
             <div class="print-header-left">
-              <div class="logo-box">01</div>
+              <div class="logo-box">AU</div>
               <div>
-                <h1 class="store-title">Zero Um Stock Manager</h1>
+                <h1 class="store-title">Aura Stock Manager</h1>
                 <p class="store-subtitle">Painel de Controle Executivo</p>
               </div>
             </div>
@@ -671,7 +671,7 @@ export const gerarRelatorioHtml = ({
           </div>
           
           <div class="print-footer">
-            Zero Um Stock Manager &nbsp;|&nbsp; Página 2 de 3 &nbsp;|&nbsp; Confidencial &nbsp;|&nbsp; Gerado pelo Sistema
+            Aura Stock Manager &nbsp;|&nbsp; Página 2 de 3 &nbsp;|&nbsp; Confidencial &nbsp;|&nbsp; Gerado pelo Sistema
           </div>
         </div>
         
@@ -679,9 +679,9 @@ export const gerarRelatorioHtml = ({
         <div class="page">
           <div class="print-header">
             <div class="print-header-left">
-              <div class="logo-box">01</div>
+              <div class="logo-box">AU</div>
               <div>
-                <h1 class="store-title">Zero Um Stock Manager</h1>
+                <h1 class="store-title">Aura Stock Manager</h1>
                 <p class="store-subtitle">Painel de Controle Executivo</p>
               </div>
             </div>
@@ -769,7 +769,7 @@ export const gerarRelatorioHtml = ({
 
           <div class="section" style="margin-top: 30px; border-top: 1px solid #E5E7EB; padding-top: 15px;">
             <p style="font-size: 8pt; color: #6B7280; margin: 0; text-align: center; font-weight: 500;">
-              Relatório consolidado gerado via Zero Um Stock Manager. Declaro a exatidão das informações.
+              Relatório consolidado gerado via Aura Stock Manager. Declaro a exatidão das informações.
             </p>
             
             <div class="signature-block">
@@ -782,12 +782,12 @@ export const gerarRelatorioHtml = ({
             </div>
             
             <p class="text-center" style="font-size: 7.5pt; color: #9CA3AF; margin-top: 25px; font-style: italic; text-align: center; font-weight: 500;">
-              Zero Um Stock Manager © 2026 — Documento confidencial de uso exclusivo interno.
+              Aura Stock Manager © 2026 — Documento confidencial de uso exclusivo interno.
             </p>
           </div>
           
           <div class="print-footer">
-            Zero Um Stock Manager &nbsp;|&nbsp; Página 3 de 3 &nbsp;|&nbsp; Confidencial &nbsp;|&nbsp; Gerado pelo Sistema
+            Aura Stock Manager &nbsp;|&nbsp; Página 3 de 3 &nbsp;|&nbsp; Confidencial &nbsp;|&nbsp; Gerado pelo Sistema
           </div>
         </div>
         
