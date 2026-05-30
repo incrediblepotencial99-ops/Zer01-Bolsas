@@ -327,6 +327,16 @@ export default function App() {
   // Initialize activeStore once profile and stores are loaded
   useEffect(() => {
     if (profile && lojas.length > 0 && !activeStore) {
+      // Tentar carregar a última loja selecionada salva no localStorage
+      const savedStoreId = localStorage.getItem(`activeStoreId_${profile.id}`);
+      if (savedStoreId) {
+        const savedStore = lojas.find(l => l.id === savedStoreId);
+        if (savedStore) {
+          setActiveStore(savedStore);
+          return;
+        }
+      }
+
       if (profile.role === "admin") {
         const defaultStore = lojas.find(l => l.nome === "Loja Matriz") || lojas[0];
         setActiveStore(defaultStore);
@@ -484,6 +494,9 @@ export default function App() {
   const handleSetActiveStore = (store) => {
     setActiveStore(store);
     setCart([]); // Clear cart when switching stores
+    if (profile) {
+      localStorage.setItem(`activeStoreId_${profile.id}`, store.id);
+    }
   };
 
   const checkIfSystemHasUsers = async () => {
