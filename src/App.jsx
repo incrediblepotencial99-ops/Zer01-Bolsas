@@ -7755,7 +7755,7 @@ export default function App() {
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 30, scale: 0.95 }}
                 transition={{ type: "spring", damping: 25, stiffness: 220 }}
-                className="absolute bottom-16 right-0 w-[88vw] sm:w-[360px] h-[400px] sm:h-[480px] sm:mb-4 bg-white border border-[#EACAD6]/60 rounded-3xl shadow-[0_12px_40px_rgba(41,20,27,0.15)] flex flex-col overflow-hidden z-50 font-sans"
+                className="absolute bottom-0 right-0 w-[88vw] sm:w-[360px] h-[360px] sm:h-[460px] bg-white border border-[#EACAD6]/60 rounded-3xl shadow-[0_12px_40px_rgba(41,20,27,0.15)] flex flex-col overflow-hidden z-50 font-sans"
               >
                 {/* Header */}
                 <div className="bg-[#29141B] text-white p-4.5 flex items-center justify-between border-b border-[#D12D6C]/20">
@@ -7939,27 +7939,21 @@ export default function App() {
           </AnimatePresence>
 
           {/* Floating Bubble Button */}
-          <button
-            onClick={() => setIsChatOpen(!isChatOpen)}
-            className={`w-14 h-14 rounded-full text-white shadow-[0_8px_30px_rgba(209,45,108,0.35)] hover:shadow-[0_12px_40px_rgba(209,45,108,0.5)] flex items-center justify-center transition-all duration-300 transform hover:-translate-y-1 hover:scale-105 active:translate-y-0 active:scale-95 cursor-pointer relative group ${
-              isChatOpen 
-                ? "bg-[#29141B] border border-[#D12D6C]/30 shadow-none hover:-translate-y-0 hover:scale-100" 
-                : "bg-gradient-to-r from-[#D12D6C] via-[#E23B7C] to-[#F44B8C]"
-            }`}
-            title="Chat Corporativo Aura"
-          >
-            {/* Badge para mensagens não lidas */}
-            {unreadChatCount > 0 && !isChatOpen && (
-              <span className="absolute -top-1 -right-1 bg-[#B80E4D] text-white text-[9px] font-black border-2 border-white w-5.5 h-5.5 rounded-full flex items-center justify-center animate-bounce shadow-md">
-                {unreadChatCount}
-              </span>
-            )}
-            {isChatOpen ? (
-              <span className="material-symbols-outlined text-[24px] rotate-90 transition-transform duration-300">close</span>
-            ) : (
-              <span className="material-symbols-outlined text-[24px] group-hover:rotate-12 transition-transform duration-300">forum</span>
-            )}
-          </button>
+          {!isChatOpen && (
+            <button
+              onClick={() => setIsChatOpen(true)}
+              className="w-14 h-14 rounded-full text-white shadow-[0_8px_30px_rgba(209,45,108,0.35)] hover:shadow-[0_12px_40px_rgba(209,45,108,0.5)] flex items-center justify-center transition-all duration-300 transform hover:-translate-y-1 hover:scale-105 active:translate-y-0 active:scale-95 cursor-pointer relative bg-gradient-to-r from-[#D12D6C] via-[#E23B7C] to-[#F44B8C]"
+              title="Chat Corporativo Aura"
+            >
+              {/* Badge para mensagens não lidas */}
+              {unreadChatCount > 0 && (
+                <span className="absolute -top-1 -right-1 bg-[#B80E4D] text-white text-[9px] font-black border-2 border-white w-5.5 h-5.5 rounded-full flex items-center justify-center animate-bounce shadow-md">
+                  {unreadChatCount}
+                </span>
+              )}
+              <span className="material-symbols-outlined text-[24px]">forum</span>
+            </button>
+          )}
         </div>
       )}
 
