@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useRef } from "react";
 import { 
   Package, Users, UserCog, ArrowUpRight, RefreshCcw, Plus, Search, 
   Trash2, LogOut, Camera, QrCode, Sparkles, Percent, BarChart3, 
@@ -109,6 +109,16 @@ export default function App() {
   const [selectedClienteForHistory, setSelectedClienteForHistory] = useState(null);
   const [dossieComprasOpen, setDossieComprasOpen] = useState(true);
   const [dossieTrocasOpen, setDossieTrocasOpen] = useState(false);
+  
+  // Chat States
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [chatMessages, setChatMessages] = useState([]);
+  const [chatInput, setChatInput] = useState("");
+  const [chatPresence, setChatPresence] = useState({});
+  const [myPresenceStatus, setMyPresenceStatus] = useState("online");
+  const [unreadChatCount, setUnreadChatCount] = useState(0);
+  const [chatTab, setChatTab] = useState("conversas"); // 'conversas' or 'membros'
+  const chatMessagesEndRef = useRef(null);
   
   const [formVenda, setFormVenda] = useState({
     bolsa_id: "", cliente_id: "", preco_vendido: "", observacao: "", forma_pagamento: "dinheiro", funcionario_id: ""
@@ -334,6 +344,119 @@ export default function App() {
     }
   }, [profile, lojas, funcionarioLojas, activeStore]);
 
+  // Chat Auto-Scroll to bottom when new messages arrive or chat opens
+  useEffect(() => {
+    if (chatMessagesEndRef.current) {
+      chatMessagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [chatMessages, isChatOpen]);
+
+  // Clear unread count when chat is opened
+  useEffect(() => {
+    if (isChatOpen) {
+      setUnreadChatCount(0);
+    }
+  }, [isChatOpen]);
+
+  // Realtime subscription for messages and presence
+  useEffect(() => {
+    if (!session || !profile) return;
+
+    // 1. Listen to new chat messages
+    const chatSubscription = supabase
+      .channel('chat-messages-channel')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'mensagens_chat' },
+        async (payload) => {
+          // Fetch complete details for the newly inserted message
+          const { data: msgDetail, error } = await supabase
+            .from("mensagens_chat")
+            .select("*, profiles:remetente_id(nome), lojas(nome)")
+            .eq("id", payload.new.id)
+            .single();
+
+          if (!error && msgDetail) {
+            setChatMessages((prev) => {
+              if (prev.some((m) => m.id === msgDetail.id)) return prev;
+              return [...prev, msgDetail];
+            });
+
+            if (!isChatOpen) {
+              setUnreadChatCount((c) => c + 1);
+            }
+          }
+        }
+      )
+      .subscribe();
+
+    // 2. Setup presence tracking (Supabase Presence)
+    const presenceChannel = supabase.channel('online-staff', {
+      config: {
+        presence: {
+          key: session.user.id,
+        },
+      },
+    });
+
+    presenceChannel
+      .on('presence', { event: 'sync' }, () => {
+        const state = presenceChannel.presenceState();
+        const users = {};
+        Object.keys(state).forEach((key) => {
+          const presences = state[key];
+          if (presences && presences.length > 0) {
+            const mostRecent = presences[presences.length - 1];
+            users[key] = {
+              userId: key,
+              nome: mostRecent.nome || "Funcionário",
+              loja: mostRecent.loja || "Sem Loja",
+              status: mostRecent.status || "online",
+              onlineAt: mostRecent.online_at,
+            };
+          }
+        });
+        setChatPresence(users);
+      })
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          await presenceChannel.track({
+            nome: profile.nome,
+            loja: activeStore?.nome || "Loja Geral",
+            status: myPresenceStatus,
+            online_at: new Date().toISOString(),
+          });
+        }
+      });
+
+    return () => {
+      chatSubscription.unsubscribe();
+      presenceChannel.unsubscribe();
+    };
+  }, [session, profile, activeStore, myPresenceStatus, isChatOpen]);
+
+  const handleSendChatMessage = async (e) => {
+    if (e) e.preventDefault();
+    if (!chatInput.trim() || !session || !profile) return;
+
+    const textoMsg = chatInput.trim();
+    setChatInput(""); // Clear immediately for speed
+
+    try {
+      const { error } = await supabase.from("mensagens_chat").insert({
+        remetente_id: session.user.id,
+        loja_id: activeStore?.id || null,
+        texto: textoMsg,
+      });
+
+      if (error) {
+        triggerToast("Erro ao enviar mensagem: " + error.message);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   const handleSetActiveStore = (store) => {
     setActiveStore(store);
     setCart([]); // Clear cart when switching stores
@@ -415,6 +538,14 @@ export default function App() {
       // 6. Fetch Entradas de Estoque
       const { data: eData } = await supabase.from("entradas").select("*, bolsas(nome, codigo), profiles:funcionario_id(nome)").order("created_at", { ascending: false });
       setEntradas(eData || []);
+
+      // 7. Fetch Chat Messages (Aura Chat)
+      const { data: chatData } = await supabase
+        .from("mensagens_chat")
+        .select("*, profiles:remetente_id(nome), lojas(nome)")
+        .order("created_at", { ascending: true })
+        .limit(100);
+      setChatMessages(chatData || []);
     } catch (e) {
       console.error("Error loading data:", e);
     } finally {
@@ -7624,6 +7755,225 @@ export default function App() {
           </>
         )}
       </AnimatePresence>
+
+      {/* ── SISTEMA DE CHAT EM TEMPO REAL (Aura Chat) ── */}
+      {session && profile && (
+        <div className="fixed bottom-6 right-6 z-[90] print:hidden flex flex-col items-end">
+          {/* Chat Window Panel */}
+          <AnimatePresence>
+            {isChatOpen && (
+              <motion.div
+                initial={{ opacity: 0, y: 50, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 30, scale: 0.95 }}
+                transition={{ type: "spring", damping: 25, stiffness: 220 }}
+                className="w-[92vw] sm:w-[380px] h-[520px] bg-white border border-[#EACAD6]/60 rounded-3xl shadow-[0_12px_40px_rgba(41,20,27,0.15)] flex flex-col overflow-hidden mb-4 relative z-50 font-sans"
+              >
+                {/* Header */}
+                <div className="bg-[#29141B] text-white p-4.5 flex items-center justify-between border-b border-[#D12D6C]/20">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#D12D6C] to-[#FC5897] flex items-center justify-center font-extrabold text-xs text-white">
+                      AU
+                    </div>
+                    <div>
+                      <h3 className="text-xs font-black tracking-widest uppercase">Chat da Rede</h3>
+                      <p className="text-[9px] text-white/55 font-semibold mt-0.5">Comunicação entre filiais</p>
+                    </div>
+                  </div>
+                  
+                  {/* Status do Usuário Atual */}
+                  <div className="flex items-center gap-2">
+                    <div className="relative">
+                      <select
+                        value={myPresenceStatus}
+                        onChange={(e) => setMyPresenceStatus(e.target.value)}
+                        className="bg-white/10 hover:bg-white/15 border border-white/20 text-white text-[10px] font-bold py-1 pl-6 pr-2 rounded-xl outline-none appearance-none cursor-pointer transition-all"
+                      >
+                        <option value="online" className="text-black">Online</option>
+                        <option value="ocupado" className="text-black">Ocupado</option>
+                        <option value="offline" className="text-black">Invisível</option>
+                      </select>
+                      {/* Led indicador de status do proprio usuario no dropdown */}
+                      <span className={`absolute left-2.5 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full ${
+                        myPresenceStatus === 'online' ? 'bg-emerald-500' :
+                        myPresenceStatus === 'ocupado' ? 'bg-amber-500' : 'bg-gray-400'
+                      }`} />
+                    </div>
+                    
+                    <button
+                      onClick={() => setIsChatOpen(false)}
+                      className="w-7 h-7 rounded-lg bg-white/5 hover:bg-white/10 text-white/80 hover:text-white flex items-center justify-center transition-all cursor-pointer"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">close</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Tabs */}
+                <div className="flex border-b border-[#FCEEF3] bg-[#FCFAF9] text-xs font-bold text-[#29141B]/70">
+                  <button
+                    onClick={() => setChatTab("conversas")}
+                    className={`flex-1 py-3 text-center transition-all relative cursor-pointer ${
+                      chatTab === "conversas" ? "text-[#D12D6C] font-black" : "hover:text-[#D12D6C]"
+                    }`}
+                  >
+                    Conversas
+                    {chatTab === "conversas" && (
+                      <span className="absolute bottom-0 left-1/4 right-1/4 h-0.5 bg-[#D12D6C] rounded-full" />
+                    )}
+                  </button>
+                  <button
+                    onClick={() => setChatTab("membros")}
+                    className={`flex-1 py-3 text-center transition-all relative cursor-pointer ${
+                      chatTab === "membros" ? "text-[#D12D6C] font-black" : "hover:text-[#D12D6C]"
+                    }`}
+                  >
+                    Equipe ({Object.keys(chatPresence).length})
+                    {chatTab === "membros" && (
+                      <span className="absolute bottom-0 left-1/4 right-1/4 h-0.5 bg-[#D12D6C] rounded-full" />
+                    )}
+                  </button>
+                </div>
+
+                {/* Content */}
+                <div className="flex-1 overflow-y-auto p-4 bg-[#FCFAF8] flex flex-col gap-3">
+                  {chatTab === "conversas" ? (
+                    chatMessages.length === 0 ? (
+                      <div className="flex-1 flex flex-col items-center justify-center gap-2.5 text-[#29141B]/40 py-12">
+                        <span className="material-symbols-outlined text-4xl">forum</span>
+                        <p className="text-xs font-bold">Nenhuma mensagem no chat ainda.</p>
+                        <p className="text-[10px] text-center max-w-[200px]">Envie uma mensagem abaixo para iniciar a conversa com a rede!</p>
+                      </div>
+                    ) : (
+                      chatMessages.map((msg) => {
+                        const isMe = msg.remetente_id === session.user.id;
+                        const horaFmt = new Date(msg.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+                        return (
+                          <div
+                            key={msg.id}
+                            className={`flex flex-col max-w-[80%] ${isMe ? "self-end items-end" : "self-start items-start"}`}
+                          >
+                            {/* Nome e Loja do Remetente */}
+                            {!isMe && (
+                              <span className="text-[9px] text-[#29141B]/55 font-extrabold mb-0.5 ml-1">
+                                {msg.profiles?.nome || "Funcionário"} • <span className="text-[#D12D6C]">{msg.lojas?.nome || "Geral"}</span>
+                              </span>
+                            )}
+                            {/* Bolha da mensagem */}
+                            <div
+                              className={`px-3.5 py-2.5 rounded-2xl text-xs leading-relaxed font-medium ${
+                                isMe
+                                  ? "bg-gradient-to-r from-[#D12D6C] to-[#E23B7C] text-white rounded-tr-none shadow-[0_4px_12px_rgba(209,45,108,0.18)]"
+                                  : "bg-[#FFFFFF] border border-[#EACAD6]/40 text-[#29141B] rounded-tl-none shadow-xs"
+                              }`}
+                            >
+                              <p className="break-words">{msg.texto}</p>
+                              <span className={`text-[8px] block text-right mt-1.5 font-bold ${isMe ? "text-white/60" : "text-[#29141B]/40"}`}>
+                                {horaFmt}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )
+                  ) : (
+                    /* Membros / Presença List */
+                    <div className="flex flex-col gap-3">
+                      <div className="text-[9px] font-extrabold text-[#29141B]/50 uppercase tracking-widest mb-1">
+                        Funcionários Conectados Agora
+                      </div>
+                      {Object.values(chatPresence).length === 0 ? (
+                        <p className="text-xs text-[#29141B]/40 text-center py-6">Nenhum outro funcionário conectado.</p>
+                      ) : (
+                        Object.values(chatPresence).map((user) => {
+                          const isCur = user.userId === session.user.id;
+                          return (
+                            <div
+                              key={user.userId}
+                              className="bg-white border border-[#EACAD6]/35 p-3 rounded-2xl flex items-center justify-between shadow-2xs hover:scale-[1.01] transition-transform"
+                            >
+                              <div className="flex items-center gap-3">
+                                {/* Avatar */}
+                                <div className="relative select-none">
+                                  <div className="w-8 h-8 rounded-full bg-[#FFEBF2] border border-[#FAD6E5] text-[#D12D6C] font-extrabold text-[10px] flex items-center justify-center">
+                                    {user.nome.substring(0, 2).toUpperCase()}
+                                  </div>
+                                  <span className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full ring-2 ring-white ${
+                                    user.status === 'online' ? 'bg-emerald-500' :
+                                    user.status === 'ocupado' ? 'bg-amber-500' : 'bg-gray-400'
+                                  }`} />
+                                </div>
+                                <div className="flex flex-col">
+                                  <span className="text-xs font-bold text-[#29141B]">{user.nome} {isCur && "(Você)"}</span>
+                                  <span className="text-[9px] text-[#29141B]/55 font-semibold mt-0.5">{user.loja}</span>
+                                </div>
+                              </div>
+                              <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-md border ${
+                                user.status === 'online' ? 'bg-emerald-550 border-emerald-100 text-emerald-600' :
+                                user.status === 'ocupado' ? 'bg-amber-550 border-amber-100 text-amber-600' : 'bg-gray-55 border-gray-100 text-gray-400'
+                              }`}>
+                                {user.status}
+                              </span>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  )}
+                  {/* Marcador de scroll */}
+                  <div ref={chatMessagesEndRef} />
+                </div>
+
+                {/* Input Area (Only in conversas tab) */}
+                {chatTab === "conversas" && (
+                  <form
+                    onSubmit={handleSendChatMessage}
+                    className="p-3 border-t border-[#FCEEF3] bg-white flex items-center gap-2.5"
+                  >
+                    <input
+                      type="text"
+                      value={chatInput}
+                      onChange={(e) => setChatInput(e.target.value)}
+                      placeholder="Escreva uma mensagem..."
+                      className="flex-1 h-10 px-4 rounded-xl border border-[#EACAD6]/80 bg-[#FCFAF9] text-xs font-semibold text-[#29141B] placeholder-[#29141B]/40 focus:outline-none focus:border-[#D12D6C] focus:bg-white transition-all"
+                    />
+                    <button
+                      type="submit"
+                      disabled={!chatInput.trim()}
+                      className="w-10 h-10 rounded-xl bg-gradient-to-r from-[#D12D6C] to-[#E23B7C] text-white flex items-center justify-center shadow-[0_4px_12px_rgba(209,45,108,0.2)] hover:scale-105 active:scale-95 disabled:opacity-40 disabled:scale-100 disabled:shadow-none transition-all cursor-pointer"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">send</span>
+                    </button>
+                  </form>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Floating Bubble Button */}
+          <button
+            onClick={() => setIsChatOpen(!isChatOpen)}
+            className={`w-14 h-14 rounded-full text-white shadow-[0_8px_30px_rgba(209,45,108,0.35)] hover:shadow-[0_12px_40px_rgba(209,45,108,0.5)] flex items-center justify-center transition-all duration-300 transform hover:-translate-y-1 hover:scale-105 active:translate-y-0 active:scale-95 cursor-pointer relative group ${
+              isChatOpen 
+                ? "bg-[#29141B] border border-[#D12D6C]/30 shadow-none hover:-translate-y-0 hover:scale-100" 
+                : "bg-gradient-to-r from-[#D12D6C] via-[#E23B7C] to-[#F44B8C]"
+            }`}
+            title="Chat Corporativo Aura"
+          >
+            {/* Badge para mensagens não lidas */}
+            {unreadChatCount > 0 && !isChatOpen && (
+              <span className="absolute -top-1 -right-1 bg-[#B80E4D] text-white text-[9px] font-black border-2 border-white w-5.5 h-5.5 rounded-full flex items-center justify-center animate-bounce shadow-md">
+                {unreadChatCount}
+              </span>
+            )}
+            {isChatOpen ? (
+              <span className="material-symbols-outlined text-[24px] rotate-90 transition-transform duration-300">close</span>
+            ) : (
+              <span className="material-symbols-outlined text-[24px] group-hover:rotate-12 transition-transform duration-300">forum</span>
+            )}
+          </button>
+        </div>
+      )}
 
       {/* ── TOAST NOTIFICATION SYSTEM (Premium) ── */}
       <AnimatePresence>
