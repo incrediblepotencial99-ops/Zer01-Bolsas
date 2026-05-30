@@ -7015,19 +7015,7 @@ export default function App() {
         {renderBottomNavItem("troca", "Trocas", "assignment_return")}
       </nav>
 
-      {/* ── Admin FAB for quick stock actions (Mobile only) ── */}
-      {profile?.role === "admin" && (
-        <button 
-          onClick={() => {
-            setActiveTab("estoque");
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-          }}
-          aria-label="Add Product" 
-          className="md:hidden fixed bottom-20 right-4 bg-secondary text-on-secondary w-14 h-14 rounded-full shadow-lg flex items-center justify-center active:scale-90 transition-transform z-30 print:hidden"
-        >
-          <span className="material-symbols-outlined text-2xl">add</span>
-        </button>
-      )}
+
 
       {/* ── CAMERA SCANNER MODAL OVERLAY ── */}
       <AnimatePresence>
@@ -7758,7 +7746,7 @@ export default function App() {
 
       {/* ── SISTEMA DE CHAT EM TEMPO REAL (Aura Chat) ── */}
       {session && profile && (
-        <div className="fixed bottom-6 right-6 z-[90] print:hidden flex flex-col items-end">
+        <div className="fixed bottom-20 right-4 sm:bottom-6 sm:right-6 z-[90] print:hidden flex flex-col items-end">
           {/* Chat Window Panel */}
           <AnimatePresence>
             {isChatOpen && (
@@ -7767,7 +7755,7 @@ export default function App() {
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 30, scale: 0.95 }}
                 transition={{ type: "spring", damping: 25, stiffness: 220 }}
-                className="fixed inset-0 sm:absolute sm:inset-auto sm:bottom-16 sm:right-0 w-full sm:w-[360px] h-full sm:h-[480px] sm:mb-4 bg-white border-0 sm:border border-[#EACAD6]/60 rounded-none sm:rounded-3xl shadow-[0_12px_40px_rgba(41,20,27,0.15)] flex flex-col overflow-hidden z-50 font-sans"
+                className="absolute bottom-16 right-0 w-[88vw] sm:w-[360px] h-[400px] sm:h-[480px] sm:mb-4 bg-white border border-[#EACAD6]/60 rounded-3xl shadow-[0_12px_40px_rgba(41,20,27,0.15)] flex flex-col overflow-hidden z-50 font-sans"
               >
                 {/* Header */}
                 <div className="bg-[#29141B] text-white p-4.5 flex items-center justify-between border-b border-[#D12D6C]/20">
